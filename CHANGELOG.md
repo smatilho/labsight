@@ -35,5 +35,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Billing budget alert at $25 threshold
 - `.gitignore`, `.env.example`, `Makefile` with Terraform targets
 
-[Unreleased]: https://github.com/stevenatilho/labsight/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/stevenatilho/labsight/releases/tag/v0.1.0
+[Unreleased]: https://github.com/smatilho/labsight/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/smatilho/labsight/releases/tag/v0.1.0
