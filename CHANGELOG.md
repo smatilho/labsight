@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- SQL policy settings hardening: `sql_policy_mode` now validated as `strict|flex` at config load
+- Fail-fast startup validation: strict mode now requires non-empty `LABSIGHT_SQL_ALLOWED_TABLES`
+- Defensive SQL validator guards for unknown policy mode and strict-empty allowlist direct callers
+- SQL blocked-function normalization covers both namespaced and typed sqlglot nodes (for example `ML.PREDICT` parsed as `Predict`)
+- Regression tests for policy validation and typed ML function blocking
+
+### Changed
+
+- Test suite snapshot now 119 service tests + 37 ingestion tests (156 total)
+- README setup command now installs both service and ingestion dependencies before `make test`
+
 ## [0.4.0] - 2026-02-15
 
 ### Added

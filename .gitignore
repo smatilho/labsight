@@ -28,6 +28,7 @@ venv/
 node_modules/
 .next/
 CLAUDE.md
+AGENTS.md
 out/
 .vercel
 

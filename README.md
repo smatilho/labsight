@@ -1,10 +1,10 @@
 # Labsight
 
-AI-powered operations assistant for self-hosted infrastructure. Ingests real homelab documentation and infrastructure metrics, then uses RAG and agentic tool use to answer questions about your environment.
+AI-powered operations assistant for self-hosted infrastructure. Ingests real homelab documentation and infrastructure metrics, then uses RAG and tool-using agents to answer questions about your environment.
 
 ## What Is This?
 
-Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with agentic metrics analysis. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. A heuristic router classifies queries as documentation, metrics, or hybrid — documentation queries use a RAG chain with citations, while metrics and hybrid queries are dispatched to a LangGraph ReAct agent with tools for BigQuery SQL execution and vector retrieval. Every query is logged to BigQuery with router confidence scores for observability. All infrastructure is Terraform-managed.
+Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with metrics analysis via a tool-using agent. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. A heuristic router classifies queries as documentation, metrics, or hybrid — documentation queries use a RAG chain with citations, while metrics and hybrid queries are dispatched to a LangGraph ReAct agent with tools for BigQuery SQL execution and vector retrieval. Every query is logged to BigQuery with router confidence scores for observability. All infrastructure is Terraform-managed.
 
 ## Architecture
 
@@ -209,7 +209,7 @@ terraform apply   # Deploy (requires approval)
 # Run tests
 cd ..
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r service/requirements.txt pytest pytest-asyncio pytest-cov
+pip install -r service/requirements.txt -r ingestion/requirements.txt pytest pytest-asyncio pytest-cov
 make test
 
 # Upload a test document (after infra is deployed)
