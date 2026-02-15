@@ -27,3 +27,25 @@ output "budget_name" {
   description = "Billing budget resource name"
   value       = module.monitoring.budget_name
 }
+
+# --- Phase 2 outputs ---
+
+output "chromadb_service_url" {
+  description = "ChromaDB Cloud Run service URL"
+  value       = module.chromadb.service_url
+}
+
+output "ingestion_function_name" {
+  description = "Document ingestion Cloud Function name"
+  value       = module.cloud_functions.function_name
+}
+
+output "bigquery_dataset_id" {
+  description = "Platform observability BigQuery dataset ID"
+  value       = module.bigquery.dataset_id
+}
+
+output "bigquery_ingestion_table" {
+  description = "Fully-qualified ingestion_log table ID"
+  value       = module.bigquery.ingestion_log_table_id
+}

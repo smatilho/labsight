@@ -48,6 +48,9 @@ docs/*
 .DS_Store
 Thumbs.db
 
+# Build artifacts
+.build/
+
 # Test artifacts
 .coverage
 htmlcov/

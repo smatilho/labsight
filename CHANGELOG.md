@@ -14,16 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File-type-aware chunking: markdown (by headers), YAML (by top-level keys), config (by sections), fallback (sliding window)
 - Vertex AI text-embedding-004 integration with batch support
 - BigQuery `platform_observability` dataset with `ingestion_log` table (day-partitioned)
-- ChromaDB on Cloud Run with GCS-backed persistence and token auth
+- ChromaDB on Cloud Run with GCS-backed persistence (Cloud Run IAM auth)
 - Cloud Function Gen 2 triggered by GCS uploads with EventArc
-- IAM bindings for ingestion service account (storage, Vertex AI, BigQuery, Secret Manager)
+- IAM bindings for ingestion service account (storage, Vertex AI, BigQuery, Secret Manager, Cloud Run invoker)
 - Terraform modules: `bigquery`, `chromadb`, `cloud-functions`
 - GCS buckets for function artifacts and ChromaDB persistence
 - Phase 2 GCP APIs: Cloud Functions, Cloud Build, EventArc, Cloud Run, Vertex AI, Artifact Registry, Secret Manager
-- Unit tests for sanitizer, chunker, and embedder (32 tests, 82% coverage)
+- File size guard (10 MB) rejects oversized uploads before download to prevent OOM
+- Generation-based chunk IDs prevent data corruption on concurrent same-file uploads
+- Unit tests for sanitizer, chunker, and embedder (37 tests)
 - Test fixtures: sample markdown doc and docker-compose YAML
 - Makefile targets: `test-ingestion`, `logs-function`, `test-upload`
 - This changelog
+
+### Fixed
+
+- IP regex now validates octets (0-255) — previously matched invalid addresses like `10.999.999.999`
+- Secret sanitizer now catches quoted values (`password="val"`, `api_key='val'`) — previously skipped them entirely
+- Error-path BigQuery logging wrapped defensively so BQ failures can't mask the original exception
 
 ## [0.1.0] - 2025-02-13
 

@@ -1,4 +1,4 @@
-# Phase 1 APIs — later phases add their own via this same pattern.
+# API enablement — each phase adds its own list, merged into a single for_each.
 # disable_on_destroy = false prevents `terraform destroy` from disabling
 # APIs that other resources (or the GCP console) depend on.
 
@@ -13,10 +13,20 @@ locals {
     "bigquery.googleapis.com",
     "serviceusage.googleapis.com",
   ]
+
+  phase2_apis = [
+    "cloudfunctions.googleapis.com",
+    "cloudbuild.googleapis.com",
+    "eventarc.googleapis.com",
+    "run.googleapis.com",
+    "aiplatform.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "secretmanager.googleapis.com",
+  ]
 }
 
 resource "google_project_service" "apis" {
-  for_each = toset(local.phase1_apis)
+  for_each = toset(concat(local.phase1_apis, local.phase2_apis))
 
   project = var.project_id
   service = each.value
