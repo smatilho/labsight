@@ -82,3 +82,64 @@ resource "google_bigquery_table" "ingestion_log" {
     },
   ])
 }
+
+# --- Phase 3: RAG query observability ---
+
+resource "google_bigquery_table" "query_log" {
+  dataset_id          = google_bigquery_dataset.platform_observability.dataset_id
+  table_id            = "query_log"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Tracks every RAG query: model, latency, retrieval count, status"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "timestamp"
+  }
+
+  schema = jsonencode([
+    {
+      name = "timestamp"
+      type = "TIMESTAMP"
+      mode = "REQUIRED"
+    },
+    {
+      name        = "query"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "User query text (truncated to 1000 chars)"
+    },
+    {
+      name        = "query_mode"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "rag, agentic, or hybrid"
+    },
+    {
+      name = "model_used"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "retrieval_count"
+      type = "INTEGER"
+      mode = "NULLABLE"
+    },
+    {
+      name = "latency_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name        = "status"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "success or error"
+    },
+    {
+      name = "error_message"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+  ])
+}

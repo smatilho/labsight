@@ -39,11 +39,13 @@ resource "google_project_iam_member" "ingestion_vertex_ai" {
   member  = "serviceAccount:${google_service_account.ingestion.email}"
 }
 
-# Write ingestion logs to BigQuery
-resource "google_project_iam_member" "ingestion_bq_editor" {
-  project = var.project_id
-  role    = "roles/bigquery.dataEditor"
-  member  = "serviceAccount:${google_service_account.ingestion.email}"
+# Write ingestion logs to BigQuery (scoped to observability dataset only)
+resource "google_bigquery_dataset_iam_member" "ingestion_bq_editor" {
+  count      = var.bigquery_dataset_id != "" ? 1 : 0
+  project    = var.project_id
+  dataset_id = var.bigquery_dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.ingestion.email}"
 }
 
 # Run BigQuery jobs (required for inserts)
@@ -58,4 +60,29 @@ resource "google_project_iam_member" "ingestion_secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.ingestion.email}"
+}
+
+# --- Phase 3: RAG service account permissions ---
+
+# Call Vertex AI for Gemini inference and embeddings (query-time)
+resource "google_project_iam_member" "rag_vertex_ai" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.rag_service.email}"
+}
+
+# Write query logs to BigQuery (scoped to observability dataset only)
+resource "google_bigquery_dataset_iam_member" "rag_bq_editor" {
+  count      = var.bigquery_dataset_id != "" ? 1 : 0
+  project    = var.project_id
+  dataset_id = var.bigquery_dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.rag_service.email}"
+}
+
+# Run BigQuery jobs (required for streaming inserts)
+resource "google_project_iam_member" "rag_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.rag_service.email}"
 }

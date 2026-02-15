@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-15
+
+### Added
+
+- Core RAG service: FastAPI app with retrieval-augmented generation and source citations
+- Model-agnostic LLM provider abstraction: swap Gemini (Vertex AI) ↔ Claude (OpenRouter) via config
+- ChromaDB retriever as a LangChain `BaseRetriever` with Cloud Run IAM authentication
+- RAG chain with `[Source N]` citation format, streaming (SSE) and non-streaming modes
+- Input validation with prompt injection detection (heuristic patterns for ignore/override attempts)
+- BigQuery query logging for platform observability (`query_log` table)
+- Streaming query logging: `_logged_stream()` wrapper captures metadata from SSE `done` events
+- Stream error handling: exceptions yield `{"type": "error"}` + `{"type": "done"}` so frontends never hang
+- Pydantic-based settings (`LABSIGHT_` env prefix) with fail-fast validation at startup
+- FastAPI lifespan context manager for resource initialization (settings, provider, retriever, chain)
+- Cloud Run Terraform module (`cloud-run-rag`) for the RAG service deployment
+- Artifact Registry Terraform resource for Docker image storage
+- OpenRouter API key stored in Secret Manager (conditional — only when key is provided)
+- Non-root Docker user (`labsight`, UID 1000) for container security
+- Health endpoint (`/api/health`)
+- Makefile targets: `test-service`, `dev-service`, `build-service`, `deploy-service`
+- `.env.example` updated with Phase 3 variables
+- 39 unit tests across chain, chat, health, input validation, LLM providers, and retriever
+
+### Changed
+
+- BigQuery IAM scoped to dataset level (`google_bigquery_dataset_iam_member`) instead of project-level `roles/bigquery.dataEditor` — both ingestion and RAG service accounts now have least-privilege access
+- Architecture shifted from GKE to Cloud Run for the RAG service — GKE Autopilot management fee (~$72/month) exceeds the $25 billing alert; Cloud Run scales to zero with identical containerization
+
+### Fixed
+
+- ChromaDB retriever no longer caches the HTTP client — creates a fresh client with a new ID token on every call to prevent stale token failures (Google ID tokens expire after 1 hour)
+- ChromaDB version sync documented in `service/requirements.txt` (must match `terraform/modules/chromadb/main.tf` image tag)
+
 ## [0.2.0] - 2026-02-15
 
 ### Added
@@ -43,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Billing budget alert at $25 threshold
 - `.gitignore`, `.env.example`, `Makefile` with Terraform targets
 
-[Unreleased]: https://github.com/smatilho/labsight/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/smatilho/labsight/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/smatilho/labsight/releases/tag/v0.3.0
 [0.2.0]: https://github.com/smatilho/labsight/releases/tag/v0.2.0
 [0.1.0]: https://github.com/smatilho/labsight/releases/tag/v0.1.0

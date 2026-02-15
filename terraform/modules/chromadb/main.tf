@@ -134,3 +134,13 @@ resource "google_cloud_run_v2_service_iam_member" "ingestion_invoker" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${var.ingestion_sa_email}"
 }
+
+# Allow the RAG service SA to invoke ChromaDB (query-time retrieval)
+resource "google_cloud_run_v2_service_iam_member" "rag_service_invoker" {
+  count    = var.rag_service_sa_email != "" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.chromadb.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.rag_service_sa_email}"
+}

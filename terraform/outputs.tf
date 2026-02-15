@@ -49,3 +49,20 @@ output "bigquery_ingestion_table" {
   description = "Fully-qualified ingestion_log table ID"
   value       = module.bigquery.ingestion_log_table_id
 }
+
+# --- Phase 3 outputs ---
+
+output "bigquery_query_log_table" {
+  description = "Fully-qualified query_log table ID"
+  value       = module.bigquery.query_log_table_id
+}
+
+output "rag_service_url" {
+  description = "RAG service Cloud Run URL"
+  value       = module.cloud_run_rag.service_url
+}
+
+output "docker_registry_url" {
+  description = "Artifact Registry Docker repository URL"
+  value       = module.gcs.docker_registry_url
+}

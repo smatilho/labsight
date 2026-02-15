@@ -22,3 +22,9 @@ variable "ingestion_sa_email" {
   description = "Ingestion service account email (granted invoker access)"
   type        = string
 }
+
+variable "rag_service_sa_email" {
+  description = "RAG service account email (granted invoker access)"
+  type        = string
+  default     = ""
+}

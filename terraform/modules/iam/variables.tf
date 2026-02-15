@@ -8,3 +8,9 @@ variable "uploads_bucket_name" {
   type        = string
   default     = ""
 }
+
+variable "bigquery_dataset_id" {
+  description = "BigQuery dataset ID for dataset-scoped dataEditor bindings. Empty string skips the binding."
+  type        = string
+  default     = ""
+}

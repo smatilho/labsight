@@ -47,8 +47,9 @@ module "iam" {
 
   project_id          = var.project_id
   uploads_bucket_name = module.gcs.uploads_bucket_name
+  bigquery_dataset_id = module.bigquery.dataset_id
 
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, module.bigquery]
 }
 
 module "monitoring" {
@@ -82,6 +83,7 @@ module "chromadb" {
   environment          = var.environment
   chromadb_bucket_name = module.gcs.chromadb_bucket_name
   ingestion_sa_email   = module.iam.ingestion_sa_email
+  rag_service_sa_email = module.iam.rag_service_sa_email
 
   depends_on = [google_project_service.apis, module.gcs]
 }
@@ -89,14 +91,30 @@ module "chromadb" {
 module "cloud_functions" {
   source = "./modules/cloud-functions"
 
+  project_id            = var.project_id
+  region                = var.region
+  environment           = var.environment
+  uploads_bucket_name   = module.gcs.uploads_bucket_name
+  artifacts_bucket_name = module.gcs.function_artifacts_bucket_name
+  ingestion_sa_email    = module.iam.ingestion_sa_email
+  chromadb_url          = module.chromadb.service_url
+  bigquery_table_id     = module.bigquery.ingestion_log_table_id
+
+  depends_on = [module.chromadb, module.bigquery, module.iam]
+}
+
+# --- Phase 3: Core RAG service ---
+
+module "cloud_run_rag" {
+  source = "./modules/cloud-run-rag"
+
   project_id               = var.project_id
   region                   = var.region
   environment              = var.environment
-  uploads_bucket_name      = module.gcs.uploads_bucket_name
-  artifacts_bucket_name    = module.gcs.function_artifacts_bucket_name
-  ingestion_sa_email       = module.iam.ingestion_sa_email
-  chromadb_url      = module.chromadb.service_url
-  bigquery_table_id = module.bigquery.ingestion_log_table_id
+  rag_service_sa_email     = module.iam.rag_service_sa_email
+  image                    = "${module.gcs.docker_registry_url}/rag-service:latest"
+  chromadb_url             = module.chromadb.service_url
+  bigquery_query_log_table = module.bigquery.query_log_table_id
 
-  depends_on = [module.chromadb, module.bigquery, module.iam]
+  depends_on = [module.chromadb, module.bigquery, module.iam, module.gcs]
 }

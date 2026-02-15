@@ -50,3 +50,13 @@ resource "google_storage_bucket" "chromadb" {
     enabled = true
   }
 }
+
+# --- Phase 3: Artifact Registry for Docker images ---
+
+resource "google_artifact_registry_repository" "docker" {
+  repository_id = "labsight-${var.environment}"
+  project       = var.project_id
+  location      = var.region
+  format        = "DOCKER"
+  description   = "Docker images for Labsight services"
+}
