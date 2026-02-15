@@ -9,45 +9,6 @@
 #
 # Auth: Cloud Run IAM only. ChromaDB 1.x removed built-in token auth;
 # instead, Cloud Run requires a Google ID token with roles/run.invoker.
-# The token in Secret Manager is kept for potential future use but is
-# not used by the ChromaDB server itself.
-
-resource "random_password" "chromadb_token" {
-  length  = 32
-  special = false
-}
-
-resource "google_secret_manager_secret" "chromadb_token" {
-  secret_id = "chromadb-token-${var.environment}"
-  project   = var.project_id
-
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "chromadb_token" {
-  secret      = google_secret_manager_secret.chromadb_token.id
-  secret_data = random_password.chromadb_token.result
-}
-
-# Grant the default Compute Engine SA access to the secret so Cloud Run
-# can mount it as an env var. Also grant the ingestion SA.
-data "google_project" "current" {
-  project_id = var.project_id
-}
-
-resource "google_secret_manager_secret_iam_member" "compute_sa_access" {
-  secret_id = google_secret_manager_secret.chromadb_token.id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
-}
-
-resource "google_secret_manager_secret_iam_member" "ingestion_sa_access" {
-  secret_id = google_secret_manager_secret.chromadb_token.id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${var.ingestion_sa_email}"
-}
 
 # The ingestion SA runs the Cloud Run service and needs read/write access
 # to the ChromaDB GCS bucket for the FUSE volume mount.
@@ -123,7 +84,6 @@ resource "google_cloud_run_v2_service" "chromadb" {
     }
   }
 
-  depends_on = [google_secret_manager_secret_version.chromadb_token]
 }
 
 # Allow the ingestion SA to invoke ChromaDB

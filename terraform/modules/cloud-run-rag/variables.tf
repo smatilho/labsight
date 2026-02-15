@@ -46,3 +46,9 @@ variable "bigquery_query_log_table" {
   type        = string
   default     = ""
 }
+
+variable "bigquery_metrics_dataset" {
+  description = "Infrastructure metrics BigQuery dataset ID (Phase 4 agent queries)"
+  type        = string
+  default     = ""
+}

@@ -116,16 +116,11 @@ resource "google_cloud_run_v2_service" "rag_service" {
         name  = "LABSIGHT_BIGQUERY_QUERY_LOG_TABLE"
         value = var.bigquery_query_log_table
       }
+
+      env {
+        name  = "LABSIGHT_BIGQUERY_METRICS_DATASET"
+        value = var.bigquery_metrics_dataset
+      }
     }
   }
-}
-
-# Allow unauthenticated access for now — IAP will be added in Phase 5.
-# For testing, use `gcloud auth print-identity-token` to authenticate.
-resource "google_cloud_run_v2_service_iam_member" "rag_invoker" {
-  project  = var.project_id
-  location = var.region
-  name     = google_cloud_run_v2_service.rag_service.name
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${var.rag_service_sa_email}"
 }

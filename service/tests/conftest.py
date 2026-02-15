@@ -31,4 +31,7 @@ def settings() -> Settings:
         llm_provider="vertex_ai",
         openrouter_api_key="test-key",
         bigquery_query_log_table="",
+        bigquery_metrics_dataset="",
+        sql_policy_mode="strict",
+        sql_allowed_tables="uptime_events,resource_utilization,service_inventory",
     )

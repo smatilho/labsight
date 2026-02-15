@@ -5,6 +5,9 @@ or defaults. All settings are validated at startup — fail fast if
 something critical is missing.
 """
 
+from typing import Literal
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -39,3 +42,31 @@ class Settings(BaseSettings):
 
     # Observability — empty string means logging is disabled
     bigquery_query_log_table: str = ""
+
+    # Phase 4: Agent — empty string disables the agent (all queries → RAG)
+    bigquery_metrics_dataset: str = ""
+    bigquery_max_bytes_billed: int = 100_000_000
+
+    # SQL policy: "strict" requires fully-qualified table names from the
+    # allowed list; "flex" allows unqualified and table-less queries (dev use)
+    sql_policy_mode: Literal["strict", "flex"] = "strict"
+    sql_allowed_tables: str = "uptime_events,resource_utilization,service_inventory"
+
+    @model_validator(mode="after")
+    def _validate_sql_policy(self) -> "Settings":
+        """Strict SQL policy requires a non-empty table allowlist."""
+        if self.sql_policy_mode == "strict":
+            tables = [t.strip() for t in self.sql_allowed_tables.split(",") if t.strip()]
+            if not tables:
+                raise ValueError(
+                    "sql_allowed_tables must not be empty when sql_policy_mode is 'strict'. "
+                    "Provide a comma-separated list of allowed table names, or set "
+                    "sql_policy_mode to 'flex' for development use."
+                )
+        return self
+
+    def get_allowed_tables_set(self) -> frozenset[str]:
+        """Parse sql_allowed_tables into a frozenset for use by the SQL validator."""
+        return frozenset(
+            t.strip() for t in self.sql_allowed_tables.split(",") if t.strip()
+        )

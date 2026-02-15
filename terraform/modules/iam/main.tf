@@ -55,13 +55,6 @@ resource "google_project_iam_member" "ingestion_bq_job_user" {
   member  = "serviceAccount:${google_service_account.ingestion.email}"
 }
 
-# Read ChromaDB auth token from Secret Manager
-resource "google_project_iam_member" "ingestion_secret_accessor" {
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.ingestion.email}"
-}
-
 # --- Phase 3: RAG service account permissions ---
 
 # Call Vertex AI for Gemini inference and embeddings (query-time)
@@ -80,9 +73,19 @@ resource "google_bigquery_dataset_iam_member" "rag_bq_editor" {
   member     = "serviceAccount:${google_service_account.rag_service.email}"
 }
 
-# Run BigQuery jobs (required for streaming inserts)
+# Run BigQuery jobs (required for streaming inserts and agent queries)
 resource "google_project_iam_member" "rag_bq_job_user" {
   project = var.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.rag_service.email}"
+}
+
+# --- Phase 4: Read-only access to infrastructure metrics for agent queries ---
+
+resource "google_bigquery_dataset_iam_member" "rag_infra_metrics_viewer" {
+  count      = var.bigquery_infra_dataset_id != "" ? 1 : 0
+  project    = var.project_id
+  dataset_id = var.bigquery_infra_dataset_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.rag_service.email}"
 }

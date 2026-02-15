@@ -24,6 +24,7 @@ def log_query(
     latency_ms: float = 0,
     status: str = "success",
     error_message: str | None = None,
+    router_confidence: float | None = None,
 ) -> None:
     """Insert a row into the query_log BigQuery table.
 
@@ -46,6 +47,7 @@ def log_query(
             "latency_ms": round(latency_ms, 1),
             "status": status,
             "error_message": error_message[:1024] if error_message else None,
+            "router_confidence": round(router_confidence, 4) if router_confidence is not None else None,
         }
 
         errors = bq_client.insert_rows_json(table_id, [row])

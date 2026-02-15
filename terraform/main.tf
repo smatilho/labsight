@@ -6,10 +6,6 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
     archive = {
       source  = "hashicorp/archive"
       version = "~> 2.0"
@@ -45,9 +41,10 @@ module "gcs" {
 module "iam" {
   source = "./modules/iam"
 
-  project_id          = var.project_id
-  uploads_bucket_name = module.gcs.uploads_bucket_name
-  bigquery_dataset_id = module.bigquery.dataset_id
+  project_id                = var.project_id
+  uploads_bucket_name       = module.gcs.uploads_bucket_name
+  bigquery_dataset_id       = module.bigquery.dataset_id
+  bigquery_infra_dataset_id = module.bigquery.infra_metrics_dataset_id
 
   depends_on = [google_project_service.apis, module.bigquery]
 }
@@ -115,6 +112,7 @@ module "cloud_run_rag" {
   image                    = "${module.gcs.docker_registry_url}/rag-service:latest"
   chromadb_url             = module.chromadb.service_url
   bigquery_query_log_table = module.bigquery.query_log_table_id
+  bigquery_metrics_dataset = module.bigquery.infra_metrics_dataset_id
 
   depends_on = [module.chromadb, module.bigquery, module.iam, module.gcs]
 }

@@ -14,3 +14,9 @@ variable "bigquery_dataset_id" {
   type        = string
   default     = ""
 }
+
+variable "bigquery_infra_dataset_id" {
+  description = "Infrastructure metrics BigQuery dataset ID for dataViewer binding. Empty string skips the binding."
+  type        = string
+  default     = ""
+}

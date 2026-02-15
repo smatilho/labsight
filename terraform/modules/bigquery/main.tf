@@ -113,7 +113,7 @@ resource "google_bigquery_table" "query_log" {
       name        = "query_mode"
       type        = "STRING"
       mode        = "REQUIRED"
-      description = "rag, agentic, or hybrid"
+      description = "rag, metrics, or hybrid"
     },
     {
       name = "model_used"
@@ -139,6 +139,148 @@ resource "google_bigquery_table" "query_log" {
     {
       name = "error_message"
       type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name        = "router_confidence"
+      type        = "FLOAT"
+      mode        = "NULLABLE"
+      description = "Query router classification confidence (0.0-1.0)"
+    },
+  ])
+}
+
+# --- Phase 4: Infrastructure metrics dataset ---
+
+resource "google_bigquery_dataset" "infrastructure_metrics" {
+  dataset_id  = "infrastructure_metrics_${var.environment}"
+  project     = var.project_id
+  location    = var.region
+  description = "Homelab infrastructure metrics — uptime events, resource utilization, service inventory"
+
+  default_table_expiration_ms = 15552000000 # 180 days in ms
+}
+
+resource "google_bigquery_table" "uptime_events" {
+  dataset_id          = google_bigquery_dataset.infrastructure_metrics.dataset_id
+  table_id            = "uptime_events"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Service uptime/downtime events from Uptime Kuma"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "checked_at"
+  }
+
+  schema = jsonencode([
+    {
+      name = "checked_at"
+      type = "TIMESTAMP"
+      mode = "REQUIRED"
+    },
+    {
+      name = "service_name"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name        = "status"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "up or down"
+    },
+    {
+      name = "response_time_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "status_code"
+      type = "INTEGER"
+      mode = "NULLABLE"
+    },
+    {
+      name = "message"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+  ])
+}
+
+resource "google_bigquery_table" "resource_utilization" {
+  dataset_id          = google_bigquery_dataset.infrastructure_metrics.dataset_id
+  table_id            = "resource_utilization"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Node resource utilization snapshots from Proxmox"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "collected_at"
+  }
+
+  schema = jsonencode([
+    {
+      name = "collected_at"
+      type = "TIMESTAMP"
+      mode = "REQUIRED"
+    },
+    {
+      name = "node"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "cpu_percent"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "memory_percent"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "storage_percent"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+  ])
+}
+
+resource "google_bigquery_table" "service_inventory" {
+  dataset_id          = google_bigquery_dataset.infrastructure_metrics.dataset_id
+  table_id            = "service_inventory"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Current service inventory — names, hosts, ports, container types"
+
+  schema = jsonencode([
+    {
+      name = "service_name"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "host"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "port"
+      type = "INTEGER"
+      mode = "NULLABLE"
+    },
+    {
+      name        = "container_type"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "lxc or docker"
+    },
+    {
+      name = "last_seen"
+      type = "TIMESTAMP"
       mode = "NULLABLE"
     },
   ])

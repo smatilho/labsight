@@ -12,3 +12,10 @@ output "query_log_table_id" {
   description = "Fully-qualified query_log table ID (project.dataset.table)"
   value       = "${var.project_id}.${google_bigquery_dataset.platform_observability.dataset_id}.${google_bigquery_table.query_log.table_id}"
 }
+
+# --- Phase 4 outputs ---
+
+output "infra_metrics_dataset_id" {
+  description = "Infrastructure metrics BigQuery dataset ID"
+  value       = google_bigquery_dataset.infrastructure_metrics.dataset_id
+}

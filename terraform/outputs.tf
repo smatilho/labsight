@@ -66,3 +66,10 @@ output "docker_registry_url" {
   description = "Artifact Registry Docker repository URL"
   value       = module.gcs.docker_registry_url
 }
+
+# --- Phase 4 outputs ---
+
+output "bigquery_infra_metrics_dataset" {
+  description = "Infrastructure metrics BigQuery dataset ID"
+  value       = module.bigquery.infra_metrics_dataset_id
+}

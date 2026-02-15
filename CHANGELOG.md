@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-15
+
+### Added
+
+- Heuristic query router: classifies queries as `rag`, `metrics`, or `hybrid` with confidence scoring and low-confidence fallback rules (~1ms, no LLM call, deterministic)
+- LangGraph ReAct agent with two tools for metrics and hybrid query modes
+- BigQuery SQL tool: sqlglot AST-based validation (SELECT-only allowlist, single-statement enforcement, project/dataset table allowlist, auto-appended LIMIT 1000), 100MB bytes_billed cap, 30s timeout, 50KB response payload cap
+- Vector retrieval tool: wraps existing ChromaDB retriever with structured `ToolResult` return type for agent consumption
+- `infrastructure_metrics` BigQuery dataset with 3 tables: `uptime_events` (partitioned by `checked_at`), `resource_utilization` (partitioned by `collected_at`), `service_inventory`
+- Agent streaming via `astream_events(version="v2")`: SSE events for `tool_call`, `tool_result`, `token`, and `done`
+- `router_confidence` column on `query_log` table for ongoing router quality measurement
+- Seed data script (`scripts/seed_metrics.py`): generates 14 days of synthetic uptime checks, resource utilization, and service inventory with idempotent `--replace`/`--append` modes
+- Router accuracy script (`scripts/test_router_accuracy.py`): 20 golden queries with expected classifications, prints accuracy report, exits non-zero below 80%
+- Makefile targets: `seed-metrics`, `test-router-accuracy`
+- Graceful degradation: agent is `None` when `LABSIGHT_BIGQUERY_METRICS_DATASET` is unset; all queries fall back to RAG mode
+- 50 new unit tests: router (18), BigQuery SQL tool (15), vector retrieval tool (5), agent graph (4), chat routing (8)
+
+### Changed
+
+- Query taxonomy standardized: `agentic` renamed to `metrics` in BigQuery schema description and router
+- Chat endpoint dispatches by router classification: RAG-only queries bypass the agent entirely (zero regression risk)
+- `sse_event()` helper extracted to `app/utils.py` and shared between RAG chain and agent streaming
+- Makefile uses `PYTHON ?= python3` for macOS portability (overridable via `make test PYTHON=python`)
+- `.env.example` updated with `LABSIGHT_BIGQUERY_METRICS_DATASET`
+
+### Removed
+
+- Unused ChromaDB token secret resources from Terraform (5 resources: `random_password`, `google_secret_manager_secret`, secret version, 2 IAM bindings) — ChromaDB 1.x removed built-in token auth
+- `random` provider from Terraform (only used by deleted secret)
+- Unnecessary Cloud Run self-invoker IAM binding (RAG service doesn't call itself)
+- Project-level `secretmanager.secretAccessor` binding on ingestion SA (no longer needed)
+
+### Security
+
+- BigQuery IAM separation: RAG SA gets `roles/bigquery.dataViewer` (read-only) on `infrastructure_metrics` dataset, keeps `roles/bigquery.dataEditor` on `platform_observability`
+- SQL injection prevention via sqlglot AST parsing — catches comment-based attacks, case tricks, aliased subqueries, and multi-statement injection that keyword regex would miss
+
 ## [0.3.0] - 2026-02-15
 
 ### Added
@@ -76,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Billing budget alert at $25 threshold
 - `.gitignore`, `.env.example`, `Makefile` with Terraform targets
 
-[Unreleased]: https://github.com/smatilho/labsight/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/smatilho/labsight/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/smatilho/labsight/releases/tag/v0.4.0
 [0.3.0]: https://github.com/smatilho/labsight/releases/tag/v0.3.0
 [0.2.0]: https://github.com/smatilho/labsight/releases/tag/v0.2.0
 [0.1.0]: https://github.com/smatilho/labsight/releases/tag/v0.1.0

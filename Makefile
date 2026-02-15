@@ -1,7 +1,9 @@
 .PHONY: tf-init tf-plan tf-apply tf-destroy tf-fmt tf-validate tf-output \
        test test-ingestion test-service logs-function test-upload \
-       dev-service build-service deploy-service
+       dev-service build-service deploy-service \
+       seed-metrics test-router-accuracy
 
+PYTHON ?= python3
 TF_DIR = terraform
 
 # --- Terraform ---
@@ -32,10 +34,10 @@ tf-output:
 test: test-ingestion test-service
 
 test-ingestion:
-	python -m pytest ingestion/tests/ -v --cov=ingestion --cov-report=term-missing
+	$(PYTHON) -m pytest ingestion/tests/ -v --cov=ingestion --cov-report=term-missing
 
 test-service:
-	cd service && python -m pytest tests/ -v
+	PYTHONPATH=service $(PYTHON) -m pytest service/tests/ -v
 
 # --- Phase 2: Ingestion ---
 
@@ -58,3 +60,11 @@ deploy-service:
 	docker build -t $(REGISTRY)/rag-service:latest service/
 	docker push $(REGISTRY)/rag-service:latest
 	cd $(TF_DIR) && terraform apply -target=module.cloud_run_rag
+
+# --- Phase 4: Agent + BigQuery ---
+
+seed-metrics:
+	$(PYTHON) scripts/seed_metrics.py --project-id labsight-487303 --dataset infrastructure_metrics_dev
+
+test-router-accuracy:
+	$(PYTHON) scripts/test_router_accuracy.py

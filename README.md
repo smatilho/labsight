@@ -4,7 +4,7 @@ AI-powered operations assistant for self-hosted infrastructure. Ingests real hom
 
 ## What Is This?
 
-Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with metrics analysis. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. Ask a question and get a cited answer powered by Gemini or Claude, with every query logged to BigQuery for observability. All infrastructure is Terraform-managed.
+Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with agentic metrics analysis. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. A heuristic router classifies queries as documentation, metrics, or hybrid — documentation queries use a RAG chain with citations, while metrics and hybrid queries are dispatched to a LangGraph ReAct agent with tools for BigQuery SQL execution and vector retrieval. Every query is logged to BigQuery with router confidence scores for observability. All infrastructure is Terraform-managed.
 
 ## Architecture
 
@@ -43,22 +43,34 @@ Labsight is an AIOps platform built on GCP that combines document retrieval (RAG
                          ┌──────────┴──────────┐
                          │  Cloud Run          │
                          │  (RAG Service)      │
-                         │  FastAPI + LangChain│
+                         │  FastAPI + LangGraph│
                          │                     │
-                         │  ├─ Retriever       │
-                         │  ├─ RAG Chain       │
+                         │  ┌─ Query Router    │
+                         │  │  (heuristic)     │
+                         │  │                  │
+                         │  ├─ "rag" ──────────┤──► RAG Chain (citations)
+                         │  │                  │
+                         │  ├─ "metrics" ──────┤──► LangGraph ReAct Agent
+                         │  │                  │    ├─ BigQuery SQL Tool
+                         │  └─ "hybrid" ───────┤    └─ Vector Retrieval Tool
+                         │                     │
                          │  ├─ Input Validator │
                          │  └─ Query Logger    │
                          └──────────┬──────────┘
                                     │
-                         ┌──────────┴──────────┐
-                         │  LLM Provider       │
-                         │  (model-agnostic)   │
-                         │                     │
-                         │  Vertex AI (Gemini) │
-                         │  OR                 │
-                         │  OpenRouter (Claude) │
-                         └─────────────────────┘
+                    ┌───────────────┼───────────────┐
+                    ▼               │               ▼
+         ┌─────────────────┐       │    ┌─────────────────────┐
+         │  LLM Provider   │       │    │  BigQuery            │
+         │ (model-agnostic)│       │    │  infrastructure_     │
+         │                 │       │    │  metrics (read-only) │
+         │ Vertex AI       │       │    │  ├─ uptime_events    │
+         │ OR OpenRouter   │       │    │  ├─ resource_util    │
+         └─────────────────┘       │    │  └─ service_inventory│
+                                   │    └─────────────────────┘
+                                   ▼
+                         platform_observability
+                         (query_log + router_confidence)
 ```
 
 ## Tech Stack
@@ -67,6 +79,9 @@ Labsight is an AIOps platform built on GCP that combines document retrieval (RAG
 |---|---|
 | Infrastructure | Terraform (HCL), GCP |
 | RAG Service | FastAPI, LangChain, Cloud Run (Python 3.12) |
+| Agent | LangGraph ReAct agent (langgraph.prebuilt) |
+| Query Router | Heuristic classifier with confidence scoring (~1ms, no LLM) |
+| SQL Validation | sqlglot AST parser (strict/flex policy, table allowlist, fail-fast config) |
 | Document Ingestion | Cloud Functions Gen 2 (Python 3.12) |
 | Data Sanitization | Regex-based IP/secret redaction |
 | Chunking | File-type-aware (markdown, YAML, config, fallback) |
@@ -74,11 +89,21 @@ Labsight is an AIOps platform built on GCP that combines document retrieval (RAG
 | LLM (Primary) | Gemini 2.0 Flash via Vertex AI |
 | LLM (Secondary) | Claude via OpenRouter (model-agnostic swap) |
 | Vector Store | ChromaDB on Cloud Run (GCS persistence) |
+| Metrics Store | BigQuery (infrastructure_metrics dataset) |
 | Observability | BigQuery (platform_observability dataset) |
 | Auth | Cloud Run IAM (ID token), IAM service accounts |
 | Secrets | GCP Secret Manager (OpenRouter API key) |
 | Container Registry | Artifact Registry |
 | Event Triggers | EventArc (GCS → Cloud Function) |
+
+### SQL Policy Modes
+
+The BigQuery SQL tool uses a configurable policy (`LABSIGHT_SQL_POLICY_MODE`) that controls what queries the agent can generate:
+
+- **`strict`** (default, production): Requires fully-qualified table names (`project.dataset.table`), validates table names against an explicit allowlist (`LABSIGHT_SQL_ALLOWED_TABLES`), rejects table-less queries. Empty allowlist fails startup.
+- **`flex`** (development): Allows unqualified tables and table-less queries (`SELECT 1`). Project/dataset checks still enforced when qualifiers are present.
+
+IAM `dataViewer` scoped to the infrastructure_metrics dataset is the primary enforcement layer. The SQL policy is defense-in-depth against the LLM generating queries that reference tables outside the expected set.
 
 ## Project Structure
 
@@ -96,15 +121,22 @@ labsight/
 │       ├── test_embedder.py
 │       └── fixtures/
 │
-├── service/                       # RAG service (Cloud Run)
+├── service/                       # RAG + Agent service (Cloud Run)
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── app/
 │   │   ├── main.py                # FastAPI app factory (lifespan)
 │   │   ├── config.py              # Pydantic settings (LABSIGHT_ prefix)
+│   │   ├── utils.py               # Shared SSE helper
 │   │   ├── routers/
-│   │   │   ├── chat.py            # /api/chat (streaming + non-streaming)
+│   │   │   ├── chat.py            # /api/chat (routes by query classification)
 │   │   │   └── health.py          # /api/health
+│   │   ├── agent/
+│   │   │   ├── router.py          # Heuristic query router (rag/metrics/hybrid)
+│   │   │   ├── graph.py           # LangGraph ReAct agent
+│   │   │   └── tools/
+│   │   │       ├── bigquery_sql.py    # SQL validation (sqlglot) + execution
+│   │   │       └── vector_retrieval.py # ChromaDB search tool
 │   │   ├── rag/
 │   │   │   ├── retriever.py       # ChromaDB retriever (LangChain BaseRetriever)
 │   │   │   └── chain.py           # RAG chain with [Source N] citations
@@ -115,15 +147,23 @@ labsight/
 │   │   ├── guardrails/
 │   │   │   └── input_validator.py # Prompt injection detection, length limits
 │   │   └── observability/
-│   │       └── logger.py          # BigQuery query logging
+│   │       └── logger.py          # BigQuery query logging + router_confidence
 │   └── tests/
 │       ├── conftest.py
+│       ├── test_agent.py
+│       ├── test_bigquery_tool.py
 │       ├── test_chain.py
 │       ├── test_chat.py
 │       ├── test_health.py
 │       ├── test_input_validator.py
 │       ├── test_llm_providers.py
-│       └── test_retriever.py
+│       ├── test_retriever.py
+│       ├── test_router.py
+│       └── test_vector_tool.py
+│
+├── scripts/                       # Development utilities
+│   ├── seed_metrics.py            # Seed BigQuery with synthetic metrics data
+│   └── test_router_accuracy.py    # Golden query set for router accuracy
 │
 ├── terraform/                     # All GCP infrastructure
 │   ├── main.tf                    # Provider config, module wiring
@@ -134,7 +174,7 @@ labsight/
 │       ├── gcs/                   # Storage buckets + Artifact Registry
 │       ├── iam/                   # Service accounts + bindings
 │       ├── monitoring/            # Billing budget alerts
-│       ├── bigquery/              # Observability dataset (ingestion_log, query_log)
+│       ├── bigquery/              # Observability + infrastructure_metrics datasets
 │       ├── chromadb/              # ChromaDB Cloud Run service
 │       ├── cloud-functions/       # Ingestion function
 │       └── cloud-run-rag/         # RAG service (Cloud Run + Secret Manager)
@@ -168,16 +208,22 @@ terraform apply   # Deploy (requires approval)
 
 # Run tests
 cd ..
-python -m venv .venv && source .venv/bin/activate
-pip install -r service/requirements.txt pytest pytest-asyncio
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r service/requirements.txt pytest pytest-asyncio pytest-cov
 make test
 
 # Upload a test document (after infra is deployed)
 make test-upload
 
+# Seed BigQuery with synthetic metrics data
+make seed-metrics
+
 # Build and deploy the RAG service
 make build-service
 make deploy-service
+
+# Run router accuracy check
+make test-router-accuracy
 
 # Check logs
 make logs-function
@@ -188,7 +234,7 @@ make logs-function
 - [x] **Phase 1:** GCP foundation — Terraform, GCS, IAM, billing budget
 - [x] **Phase 2:** Document ingestion pipeline — sanitizer, chunker, embedder, Cloud Function
 - [x] **Phase 3:** Core RAG service — FastAPI, model abstraction, retrieval chain, citations, streaming
-- [ ] **Phase 4:** Agent + BigQuery — LangGraph agent, metrics collector, SQL tool
+- [x] **Phase 4:** Agent + BigQuery — heuristic router, LangGraph ReAct agent, BigQuery SQL tool, infrastructure_metrics dataset
 - [ ] **Phase 5:** Frontend — Next.js chat UI, upload interface, dashboard
 - [ ] **Phase 6:** RAG tuning — cross-encoder re-ranking, HNSW benchmarking
 - [ ] **Phase 7:** Guardrails, ADK evaluation, CI/CD, polish

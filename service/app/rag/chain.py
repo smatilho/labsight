@@ -22,6 +22,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.retrievers import BaseRetriever
 
+from app.utils import sse_event as _sse
+
 logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = """\
@@ -201,6 +203,3 @@ class RAGChain:
             })
 
 
-def _sse(data: dict) -> str:
-    """Format a dict as an SSE data line."""
-    return f"data: {json.dumps(data)}\n\n"
