@@ -35,6 +35,17 @@ resource "google_api_gateway_api" "labsight" {
   project  = var.project_id
 }
 
+# Ensure the managed API service is enabled for the project so
+# API key-authenticated calls do not fail with PERMISSION_DENIED.
+resource "google_project_service" "managed_gateway_service" {
+  project = var.project_id
+  service = google_api_gateway_api.labsight.managed_service
+
+  # Keep service enabled when destroying this stack to avoid
+  # intermittent teardown errors and broken re-apply sequences.
+  disable_on_destroy = false
+}
+
 # --- OpenAPI config ---
 
 resource "google_api_gateway_api_config" "labsight" {
@@ -59,6 +70,8 @@ resource "google_api_gateway_api_config" "labsight" {
   lifecycle {
     create_before_destroy = true
   }
+
+  depends_on = [google_project_service.managed_gateway_service]
 }
 
 # --- Gateway instance ---

@@ -58,6 +58,23 @@ check "iap_requires_non_public_frontend" {
   }
 }
 
+check "iap_requires_members" {
+  assert {
+    condition     = !local.iap_enabled || length(var.iap_members) > 0
+    error_message = "When domain is set (IAP mode), set TF_VAR_iap_members with at least one principal (e.g. [\"user:you@example.com\"])."
+  }
+}
+
+check "iap_requires_oauth_client" {
+  assert {
+    condition = !local.iap_enabled || (
+      trimspace(var.iap_oauth_client_id) != "" &&
+      trimspace(var.iap_oauth_client_secret) != ""
+    )
+    error_message = "When domain is set (IAP mode), set both TF_VAR_iap_oauth_client_id and TF_VAR_iap_oauth_client_secret."
+  }
+}
+
 module "gcs" {
   source = "./modules/gcs"
 
@@ -179,12 +196,14 @@ module "iap_frontend" {
   source = "./modules/iap-frontend"
   count  = local.iap_enabled ? 1 : 0
 
-  project_id            = var.project_id
-  region                = var.region
-  environment           = var.environment
-  domain                = var.domain
-  frontend_service_name = module.cloud_run_frontend.service_name
-  iap_members           = var.iap_members
+  project_id              = var.project_id
+  region                  = var.region
+  environment             = var.environment
+  domain                  = var.domain
+  frontend_service_name   = module.cloud_run_frontend.service_name
+  iap_members             = var.iap_members
+  iap_oauth_client_id     = var.iap_oauth_client_id
+  iap_oauth_client_secret = var.iap_oauth_client_secret
 
   depends_on = [module.cloud_run_frontend, google_project_service.apis]
 }

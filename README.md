@@ -207,8 +207,10 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Optional Phase 5B:
 #   domain = "labsight.atilho.com"
 #   iap_members = ["user:you@example.com"]
+#   iap_oauth_client_id = "1234567890-abc123.apps.googleusercontent.com"
+#   iap_oauth_client_secret = "GOCSPX-..."
 #   frontend_public = false
-# OAuth consent screen must be configured in GCP Console before first IAP deploy.
+# OAuth consent screen + OAuth client must be configured in Google Auth Platform before first IAP deploy.
 cd terraform
 terraform init
 terraform plan    # Review what will be created
@@ -247,6 +249,18 @@ make dev-frontend    # Frontend on :3000
 # Check logs
 make logs-function
 ```
+
+### Phase 5B Notes
+
+- `gcloud iap oauth-brands` is deprecated/non-functional for many non-org projects. Create OAuth client credentials in **Google Auth Platform > Clients**, then pass them via `iap_oauth_client_id` / `iap_oauth_client_secret`.
+- In Cloudflare, keep `labsight.<domain>` as **DNS only** (not proxied) while Google-managed cert issuance is in progress.
+- Terraform now provisions the IAP service identity and grants it `roles/run.invoker` on the frontend Cloud Run service. This prevents the runtime error: `The IAP service account is not provisioned`.
+
+### Phase 5B Troubleshooting
+
+- `FAILED_NOT_VISIBLE` on managed cert: DNS is not publicly visible to Google yet (or proxied). Verify `dig` against `1.1.1.1` and `8.8.8.8`.
+- `Empty Google Account OAuth client ID(s)/secret(s).`: backend service has IAP enabled but no OAuth client configured. Set `iap_oauth_client_id` and `iap_oauth_client_secret`.
+- `The IAP service account is not provisioned.`: ensure Terraform applied successfully after enabling IAP APIs so the service identity + invoker binding resources are created.
 
 ## Roadmap
 

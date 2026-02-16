@@ -27,3 +27,14 @@ variable "iap_members" {
   description = "List of IAP-allowed members (e.g. [\"user:you@gmail.com\"])"
   type        = list(string)
 }
+
+variable "iap_oauth_client_id" {
+  description = "OAuth client ID for IAP (Google Auth Platform > Clients)"
+  type        = string
+}
+
+variable "iap_oauth_client_secret" {
+  description = "OAuth client secret for IAP"
+  type        = string
+  sensitive   = true
+}

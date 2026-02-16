@@ -57,6 +57,19 @@ variable "iap_members" {
   default     = []
 }
 
+variable "iap_oauth_client_id" {
+  description = "OAuth client ID for IAP backend service (from Google Auth Platform > Clients)."
+  type        = string
+  default     = ""
+}
+
+variable "iap_oauth_client_secret" {
+  description = "OAuth client secret for IAP backend service."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "frontend_public" {
   description = "When true, frontend is publicly accessible (allUsers) in non-IAP mode. Must be false when domain is set."
   type        = bool

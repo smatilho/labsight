@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- IAP module now provisions the IAP service identity and frontend `roles/run.invoker` binding in Terraform (`google_project_service_identity` + `google_cloud_run_v2_service_iam_member`)
+
+### Changed
+
+- Terraform now requires explicit IAP OAuth credentials in IAP mode (`iap_oauth_client_id` + `iap_oauth_client_secret`) and fails fast if they are missing
+- Terraform now requires non-empty `iap_members` when IAP mode is enabled
+- IAP setup guidance now uses Google Auth Platform OAuth client flow (`gcloud iap oauth-brands` is deprecated/non-functional for many non-org projects)
+
+### Fixed
+
+- IAP runtime failure `The IAP service account is not provisioned` is now prevented by Terraform-managed service identity + invoker binding
+- API Gateway managed service is now auto-enabled by Terraform to prevent `PERMISSION_DENIED: API ... is not enabled for the project` 403s
+
 ## [0.5.1] - 2026-02-15
 
 ### Added

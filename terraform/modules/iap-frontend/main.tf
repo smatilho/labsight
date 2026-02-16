@@ -6,10 +6,10 @@
 #
 # Prerequisites (manual, one-time):
 #   1. Configure OAuth consent screen in GCP Console
-#      (APIs & Services > OAuth consent screen > External > add test user)
-#   2. Add a DNS A record for var.domain pointing to the static IP output
-#
-# IAP auto-creates its OAuth client when enabled on the backend service.
+#      (Google Auth Platform > Branding / Audience)
+#   2. Create OAuth client credentials in Google Auth Platform > Clients
+#      and pass them via iap_oauth_client_id / iap_oauth_client_secret
+#   3. Add a DNS A record for var.domain pointing to the static IP output
 
 # --- Static IP for DNS ---
 
@@ -57,7 +57,9 @@ resource "google_compute_backend_service" "frontend" {
   }
 
   iap {
-    enabled = true
+    enabled              = true
+    oauth2_client_id     = var.iap_oauth_client_id
+    oauth2_client_secret = var.iap_oauth_client_secret
   }
 }
 
@@ -127,4 +129,20 @@ resource "google_iap_web_backend_service_iam_binding" "frontend" {
   web_backend_service = google_compute_backend_service.frontend.name
   role                = "roles/iap.httpsResourceAccessor"
   members             = var.iap_members
+}
+
+# --- IAP service identity + frontend invoker binding ---
+
+resource "google_project_service_identity" "iap" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "iap.googleapis.com"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "iap_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = var.frontend_service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_project_service_identity.iap.email}"
 }

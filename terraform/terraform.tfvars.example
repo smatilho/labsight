@@ -5,3 +5,10 @@ environment        = "dev"
 billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
 owner_email        = "your-email@example.com"
 budget_amount      = 50
+
+# Phase 5B (optional)
+# domain                   = "labsight.atilho.com"
+# iap_members              = ["user:your-email@gmail.com"]
+# iap_oauth_client_id      = "1234567890-abc123.apps.googleusercontent.com"
+# iap_oauth_client_secret  = "GOCSPX-..."
+# frontend_public          = false

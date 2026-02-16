@@ -98,6 +98,11 @@ output "frontend_static_ip" {
   value       = var.domain != "" ? module.iap_frontend[0].static_ip : ""
 }
 
+output "iap_service_account_email" {
+  description = "IAP-managed service account email used to invoke frontend Cloud Run (empty if IAP not enabled)"
+  value       = var.domain != "" ? module.iap_frontend[0].iap_service_account_email : ""
+}
+
 output "api_gateway_url" {
   description = "API Gateway URL (empty if gateway not enabled)"
   value       = var.domain != "" ? module.api_gateway[0].gateway_url : ""
