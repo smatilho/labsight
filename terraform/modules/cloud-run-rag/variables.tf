@@ -66,7 +66,13 @@ variable "bigquery_observability_dataset" {
 }
 
 variable "frontend_sa_email" {
-  description = "Frontend service account email for invoker binding (Phase 5)"
+  description = "Frontend service account email for invoker binding (Phase 5A direct mode)"
+  type        = string
+  default     = ""
+}
+
+variable "gateway_sa_email" {
+  description = "API Gateway service account email for invoker binding (Phase 5B)"
   type        = string
   default     = ""
 }

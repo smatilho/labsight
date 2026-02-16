@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-02-15
+
+### Added
+
+- Identity-Aware Proxy (IAP) on frontend: HTTPS load balancer with managed SSL certificate, static IP, IAP-enforced Google account access control
+- API Gateway module: OpenAPI spec-driven routing from frontend to RAG backend, per-route deadlines (5s–300s), API key validation via `x-api-key` header
+- API key lifecycle: `google_apikeys_key` restricted to gateway's managed service, stored in Secret Manager, frontend SA has `secretAccessor`
+- Gateway service account (`labsight-gateway`) with `roles/run.invoker` on RAG service — gateway authenticates to backend with signed JWT
+- Frontend auth mode switching: `BACKEND_AUTH_MODE` env var selects between `id_token` (direct Cloud Run) and `api_key` (API Gateway) auth strategies
+- HTTP-to-HTTPS redirect (port 80 → 443) via separate forwarding rule
+- `google-beta` provider for API Gateway resources (`google_api_gateway_api`, `google_api_gateway_api_config`, `google_api_gateway_gateway`)
+- Terraform variables: `domain`, `iap_members`, `frontend_public` — IAP and API Gateway are conditional on `domain != ""`
+- 4 new frontend tests for backend auth mode switching (id_token, api_key, localhost skip, missing key warning)
+
+### Changed
+
+- Frontend Cloud Run ingress: `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER` when IAP-protected (was `INGRESS_TRAFFIC_ALL`); `allUsers` invoker now conditional on `frontend_public`
+- Frontend `backend.ts` rewritten to support dual auth modes — API key mode sends `x-api-key` header, ID token mode uses `google-auth-library`
+- Billing budget raised from $25 to $50 (HTTPS LB adds ~$18/month ongoing cost)
+- Test suite: 148 service + 37 ingestion + 27 frontend = **212 total** (was 208)
+- README architecture diagram updated with IAP + API Gateway layers
+- `.env.example` updated with `BACKEND_AUTH_MODE`, `BACKEND_API_KEY`, `TF_VAR_domain`, `TF_VAR_iap_members`, `TF_VAR_frontend_public`
+- Terraform root check now fails fast if `domain` is set with `frontend_public=true` to prevent bypassing IAP
+- Frontend module now forces non-public mode when `domain` is set (`frontend_public` only applies in non-IAP mode)
+- API Gateway `api_config_id` is now content-hashed to support reliable `create_before_destroy` updates
+- IAP module resource names now include environment suffixes to avoid `dev/staging/prod` naming collisions
+- `terraform.tfvars.example` now matches the Phase 5B budget baseline (`budget_amount = 50`)
+
+### Fixed
+
+- Cloud Run frontend no longer sets reserved `PORT` env var (deployment rejected by Cloud Run)
+- Frontend Docker build no longer fails when `public/` is absent; builder stage now guarantees `/app/public` exists before runtime copy
+- `jest.setup.ts` TextEncoder/TextDecoder polyfill now aliases `util` symbols to avoid TypeScript redeclaration errors during `next build`
+- Terraform apply ordering hardened: frontend module explicitly waits for API Gateway resources in IAP mode so Secret Manager-backed API key env injection does not race missing secret versions
+- API key creation collision mitigation: key name versioned (`-v2`) to avoid API Keys control-plane tombstone conflicts after delete/recreate cycles
+
+### Security
+
+- IAP replaces `allUsers` as the frontend access control — only listed Google accounts can reach the frontend
+- API Gateway validates API keys before forwarding to backend — defense-in-depth alongside Cloud Run IAM
+- Gateway SA is a separate identity from frontend SA — principle of least privilege for backend invocation
+
 ## [0.5.0] - 2026-02-15
 
 ### Added
@@ -159,7 +201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Billing budget alert at $25 threshold
 - `.gitignore`, `.env.example`, `Makefile` with Terraform targets
 
-[Unreleased]: https://github.com/smatilho/labsight/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/smatilho/labsight/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/smatilho/labsight/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/smatilho/labsight/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/smatilho/labsight/releases/tag/v0.4.0
 [0.3.0]: https://github.com/smatilho/labsight/releases/tag/v0.3.0

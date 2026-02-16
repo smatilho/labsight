@@ -9,16 +9,26 @@ Labsight is an AIOps platform built on GCP that combines document retrieval (RAG
 ## Architecture
 
 ```
-Browser (public)
+Browser
     │
+    ▼
+HTTPS LB + IAP (Identity-Aware Proxy)
+    │  (only authorized Google accounts)
     ▼
 ┌──────────────────────┐
 │  Cloud Run           │
-│  (Next.js Frontend)  │──── server-side proxy (ID token auth) ───┐
-│  /chat, /upload,     │                                           │
-│  /dashboard          │                                           │
-└──────────────────────┘                                           │
-                                                                   ▼
+│  (Next.js Frontend)  │──── server-side proxy ─────────────────┐
+│  /chat, /upload,     │                                         │
+│  /dashboard          │                                         │
+└──────────────────────┘                                         │
+                                                                 ▼
+                                                      ┌────────────────────┐
+                                                      │  API Gateway       │
+                                                      │  (API key auth,    │
+                                                      │   per-route config)│
+                                                      └────────┬───────────┘
+                                                               │ JWT (gateway SA)
+                                                               ▼
                          ┌─────────────────────┐        ┌──────────────────────┐
                          │   GCS Uploads Bucket │        │  Cloud Run           │
                          │  (labsight-uploads)  │◄───────│  (RAG Service)       │
@@ -49,6 +59,8 @@ Browser (public)
                                               └──────────┘
 ```
 
+Phase 5B is conditional. Set `TF_VAR_domain` to enable the IAP + API Gateway path above. If `domain` is empty, the frontend falls back to direct Cloud Run calls using ID token auth; `TF_VAR_frontend_public` controls whether `allUsers` access is enabled (default `false`).
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -68,8 +80,8 @@ Browser (public)
 | Vector Store | ChromaDB on Cloud Run (GCS persistence) |
 | Metrics Store | BigQuery (infrastructure_metrics dataset) |
 | Observability | BigQuery (platform_observability dataset) |
-| Auth | Cloud Run IAM (ID token), IAM service accounts |
-| Secrets | GCP Secret Manager (OpenRouter API key) |
+| Auth | IAP + API Gateway + Cloud Run IAM (when `domain` is set), direct Cloud Run ID token auth fallback otherwise |
+| Secrets | GCP Secret Manager (OpenRouter API key, Gateway API key) |
 | Container Registry | Artifact Registry |
 | Event Triggers | EventArc (GCS → Cloud Function) |
 
@@ -145,7 +157,7 @@ labsight/
 │       │   └── api/               # Server-side proxy route handlers
 │       ├── components/            # UI components
 │       └── lib/
-│           ├── backend.ts         # ID token auth + fetch wrapper
+│           ├── backend.ts         # Auth-mode-aware fetch (ID token / API key)
 │           └── types.ts           # TypeScript interfaces
 │
 ├── scripts/                       # Development utilities
@@ -165,7 +177,9 @@ labsight/
 │       ├── chromadb/              # ChromaDB Cloud Run service
 │       ├── cloud-functions/       # Ingestion function
 │       ├── cloud-run-rag/         # RAG service (Cloud Run + Secret Manager)
-│       └── cloud-run-frontend/    # Frontend (Cloud Run, unauthenticated)
+│       ├── cloud-run-frontend/    # Frontend (Cloud Run, IAP-protected)
+│       ├── iap-frontend/          # HTTPS LB + IAP + managed SSL cert
+│       └── api-gateway/           # API Gateway + API key + Secret Manager
 │
 ├── Makefile
 ├── CHANGELOG.md
@@ -190,10 +204,17 @@ cd labsight
 # Deploy infrastructure
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Edit terraform.tfvars with your project ID, billing account, email
+# Optional Phase 5B:
+#   domain = "labsight.atilho.com"
+#   iap_members = ["user:you@example.com"]
+#   frontend_public = false
+# OAuth consent screen must be configured in GCP Console before first IAP deploy.
 cd terraform
 terraform init
 terraform plan    # Review what will be created
 terraform apply   # Deploy (requires approval)
+
+# If domain is set: create DNS A record to terraform output frontend_static_ip
 
 # Run tests
 cd ..
@@ -234,7 +255,7 @@ make logs-function
 - [x] **Phase 3:** Core RAG service — FastAPI, model abstraction, retrieval chain, citations, streaming
 - [x] **Phase 4:** Agent + BigQuery — heuristic router, LangGraph ReAct agent, BigQuery SQL tool, infrastructure_metrics dataset
 - [x] **Phase 5A:** Frontend — Next.js chat UI (streaming SSE), file upload, dashboard, rate limiting
-- [ ] **Phase 5B:** IAP + API Gateway — identity-aware proxy, rate limiting at edge
+- [x] **Phase 5B:** IAP + API Gateway — identity-aware proxy, API key auth, managed SSL
 - [ ] **Phase 6:** RAG tuning — cross-encoder re-ranking, HNSW benchmarking
 - [ ] **Phase 7:** Guardrails, ADK evaluation, CI/CD, polish
 
@@ -242,4 +263,4 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
 ## Cost
 
-Runs almost entirely within GCP free tier. Vertex AI embedding calls are fractions of a cent. Gemini 2.0 Flash has a generous free tier. Cloud Run scales to zero when idle. Billing alert set at $25/month as a safety net.
+Runs almost entirely within GCP free tier. Vertex AI embedding calls are fractions of a cent. Gemini 2.0 Flash has a generous free tier. Cloud Run scales to zero when idle. The HTTPS load balancer for IAP is the main ongoing cost (~$18/month). Billing alert set at $50/month as a safety net.

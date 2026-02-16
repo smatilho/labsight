@@ -135,7 +135,7 @@ resource "google_cloud_run_v2_service" "rag_service" {
   }
 }
 
-# --- Phase 5: Frontend SA invoker binding ---
+# --- Phase 5A: Frontend SA invoker binding (direct mode) ---
 # Kept in the RAG module so all RAG service IAM lives in one place.
 
 resource "google_cloud_run_v2_service_iam_member" "frontend_invoker" {
@@ -145,4 +145,15 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_invoker" {
   name     = google_cloud_run_v2_service.rag_service.name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${var.frontend_sa_email}"
+}
+
+# --- Phase 5B: API Gateway SA invoker binding ---
+
+resource "google_cloud_run_v2_service_iam_member" "gateway_invoker" {
+  count    = var.gateway_sa_email != "" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.rag_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.gateway_sa_email}"
 }

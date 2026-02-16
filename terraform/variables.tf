@@ -40,5 +40,25 @@ variable "owner_email" {
 variable "budget_amount" {
   description = "Monthly budget alert threshold in USD"
   type        = number
-  default     = 25
+  default     = 50
+}
+
+# --- Phase 5B: IAP + API Gateway ---
+
+variable "domain" {
+  description = "Domain for the IAP-protected frontend (e.g. labsight.atilho.com)"
+  type        = string
+  default     = ""
+}
+
+variable "iap_members" {
+  description = "List of IAP-allowed members (e.g. [\"user:you@gmail.com\"])"
+  type        = list(string)
+  default     = []
+}
+
+variable "frontend_public" {
+  description = "When true, frontend is publicly accessible (allUsers) in non-IAP mode. Must be false when domain is set."
+  type        = bool
+  default     = false
 }

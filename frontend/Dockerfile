@@ -8,6 +8,8 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 COPY . .
+# Ensure /app/public always exists so COPY in runtime stage never fails.
+RUN mkdir -p /app/public
 RUN npm run build
 
 # --- Production stage ---
@@ -23,7 +25,7 @@ RUN addgroup --system --gid 1001 labsight && \
 # Copy standalone output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
+COPY --from=builder /app/public ./public
 
 USER labsight
 

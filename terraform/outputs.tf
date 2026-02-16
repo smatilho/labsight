@@ -74,7 +74,7 @@ output "bigquery_infra_metrics_dataset" {
   value       = module.bigquery.infra_metrics_dataset_id
 }
 
-# --- Phase 5 outputs ---
+# --- Phase 5A outputs ---
 
 output "frontend_service_url" {
   description = "Frontend Cloud Run service URL"
@@ -84,4 +84,26 @@ output "frontend_service_url" {
 output "frontend_sa_email" {
   description = "Frontend service account email"
   value       = module.iam.frontend_sa_email
+}
+
+# --- Phase 5B outputs ---
+
+output "frontend_iap_url" {
+  description = "IAP-protected frontend URL (empty if IAP not enabled)"
+  value       = var.domain != "" ? module.iap_frontend[0].frontend_iap_url : ""
+}
+
+output "frontend_static_ip" {
+  description = "Static IP for DNS A record (empty if IAP not enabled)"
+  value       = var.domain != "" ? module.iap_frontend[0].static_ip : ""
+}
+
+output "api_gateway_url" {
+  description = "API Gateway URL (empty if gateway not enabled)"
+  value       = var.domain != "" ? module.api_gateway[0].gateway_url : ""
+}
+
+output "gateway_sa_email" {
+  description = "API Gateway service account email (empty if gateway not enabled)"
+  value       = module.iam.gateway_sa_email
 }

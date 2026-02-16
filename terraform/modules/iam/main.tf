@@ -97,6 +97,16 @@ resource "google_storage_bucket_iam_member" "rag_uploads_writer" {
   member = "serviceAccount:${google_service_account.rag_service.email}"
 }
 
+# --- Phase 5B: API Gateway service account ---
+
+resource "google_service_account" "gateway" {
+  count        = var.enable_gateway ? 1 : 0
+  account_id   = "labsight-apigateway"
+  display_name = "Labsight API Gateway"
+  description  = "API Gateway SA — invokes RAG backend on behalf of frontend"
+  project      = var.project_id
+}
+
 # --- Phase 4: Read-only access to infrastructure metrics for agent queries ---
 
 resource "google_bigquery_dataset_iam_member" "rag_infra_metrics_viewer" {

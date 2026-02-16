@@ -23,10 +23,19 @@ locals {
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
   ]
+
+  phase5b_apis = [
+    "compute.googleapis.com",
+    "iap.googleapis.com",
+    "apigateway.googleapis.com",
+    "servicemanagement.googleapis.com",
+    "servicecontrol.googleapis.com",
+    "apikeys.googleapis.com",
+  ]
 }
 
 resource "google_project_service" "apis" {
-  for_each = toset(concat(local.phase1_apis, local.phase2_apis))
+  for_each = toset(concat(local.phase1_apis, local.phase2_apis, local.phase5b_apis))
 
   project = var.project_id
   service = each.value

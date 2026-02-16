@@ -17,3 +17,8 @@ output "frontend_sa_email" {
   description = "Frontend service account email"
   value       = google_service_account.frontend.email
 }
+
+output "gateway_sa_email" {
+  description = "API Gateway service account email (empty if gateway not enabled)"
+  value       = var.enable_gateway ? google_service_account.gateway[0].email : ""
+}

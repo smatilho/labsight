@@ -20,3 +20,9 @@ variable "bigquery_infra_dataset_id" {
   type        = string
   default     = ""
 }
+
+variable "enable_gateway" {
+  description = "When true, creates the API Gateway service account."
+  type        = bool
+  default     = false
+}

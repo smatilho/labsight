@@ -4,4 +4,4 @@ zone               = "us-east1-b"
 environment        = "dev"
 billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
 owner_email        = "your-email@example.com"
-budget_amount      = 25
+budget_amount      = 50

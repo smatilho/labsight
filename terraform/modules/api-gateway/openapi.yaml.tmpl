@@ -1,0 +1,102 @@
+swagger: '2.0'
+info:
+  title: Labsight API Gateway
+  version: '1.0'
+  description: API Gateway for the Labsight RAG backend
+schemes:
+  - https
+produces:
+  - application/json
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+paths:
+  /api/chat:
+    post:
+      operationId: chat
+      summary: Chat with the RAG service (supports SSE streaming)
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/chat
+        jwt_audience: ${backend_url}
+        deadline: 300.0
+      consumes:
+        - application/json
+      responses:
+        '200':
+          description: Chat response (JSON or SSE stream)
+  /api/upload:
+    post:
+      operationId: upload
+      summary: Upload a file for ingestion
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/upload
+        jwt_audience: ${backend_url}
+        deadline: 60.0
+      consumes:
+        - multipart/form-data
+      responses:
+        '200':
+          description: Upload result
+  /api/upload/status:
+    get:
+      operationId: uploadStatus
+      summary: Check ingestion status for a file
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/upload/status
+        jwt_audience: ${backend_url}
+        deadline: 15.0
+      parameters:
+        - name: file_name
+          in: query
+          type: string
+          required: true
+      responses:
+        '200':
+          description: Ingestion status
+  /api/upload/recent:
+    get:
+      operationId: uploadRecent
+      summary: List recent ingestion events
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/upload/recent
+        jwt_audience: ${backend_url}
+        deadline: 15.0
+      responses:
+        '200':
+          description: Recent ingestions
+  /api/dashboard/overview:
+    get:
+      operationId: dashboardOverview
+      summary: Aggregated dashboard metrics
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/dashboard/overview
+        jwt_audience: ${backend_url}
+        deadline: 30.0
+      responses:
+        '200':
+          description: Dashboard data
+  /api/health:
+    get:
+      operationId: health
+      summary: Health check
+      security:
+        - api_key: []
+      x-google-backend:
+        address: ${backend_url}/api/health
+        jwt_audience: ${backend_url}
+        deadline: 5.0
+      responses:
+        '200':
+          description: Health status

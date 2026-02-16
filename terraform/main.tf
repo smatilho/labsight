@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 6.0"
+    }
     archive = {
       source  = "hashicorp/archive"
       version = "~> 2.0"
@@ -28,6 +32,32 @@ provider "google" {
   }
 }
 
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
+  zone    = var.zone
+
+  user_project_override = true
+  billing_project       = var.project_id
+
+  default_labels = {
+    project     = "labsight"
+    environment = var.environment
+    managed_by  = "terraform"
+  }
+}
+
+locals {
+  iap_enabled = var.domain != ""
+}
+
+check "iap_requires_non_public_frontend" {
+  assert {
+    condition     = !(local.iap_enabled && var.frontend_public)
+    error_message = "frontend_public must be false when domain is set (IAP mode). Set TF_VAR_frontend_public=false or clear TF_VAR_domain."
+  }
+}
+
 module "gcs" {
   source = "./modules/gcs"
 
@@ -45,6 +75,7 @@ module "iam" {
   uploads_bucket_name       = module.gcs.uploads_bucket_name
   bigquery_dataset_id       = module.bigquery.dataset_id
   bigquery_infra_dataset_id = module.bigquery.infra_metrics_dataset_id
+  enable_gateway            = local.iap_enabled
 
   depends_on = [google_project_service.apis, module.bigquery]
 }
@@ -116,11 +147,12 @@ module "cloud_run_rag" {
   gcs_uploads_bucket             = module.gcs.uploads_bucket_name
   bigquery_observability_dataset = module.bigquery.dataset_id
   frontend_sa_email              = module.iam.frontend_sa_email
+  gateway_sa_email               = module.iam.gateway_sa_email
 
   depends_on = [module.chromadb, module.bigquery, module.iam, module.gcs]
 }
 
-# --- Phase 5: Frontend ---
+# --- Phase 5A: Frontend ---
 
 module "cloud_run_frontend" {
   source = "./modules/cloud-run-frontend"
@@ -130,7 +162,43 @@ module "cloud_run_frontend" {
   environment       = var.environment
   frontend_sa_email = module.iam.frontend_sa_email
   image             = "${module.gcs.docker_registry_url}/frontend:latest"
-  backend_url       = module.cloud_run_rag.service_url
+  frontend_public   = local.iap_enabled ? false : var.frontend_public
 
-  depends_on = [module.cloud_run_rag, module.iam, module.gcs]
+  # When API Gateway is enabled (domain set), route through gateway with API key auth.
+  # Otherwise, direct Cloud Run with ID token auth (Phase 5A fallback).
+  backend_url       = local.iap_enabled ? "https://${module.api_gateway[0].gateway_url}" : module.cloud_run_rag.service_url
+  backend_auth_mode = local.iap_enabled ? "api_key" : "id_token"
+  api_key_secret_id = local.iap_enabled ? module.api_gateway[0].api_key_secret_id : ""
+
+  depends_on = [module.cloud_run_rag, module.iam, module.gcs, module.api_gateway]
+}
+
+# --- Phase 5B: IAP + API Gateway ---
+
+module "iap_frontend" {
+  source = "./modules/iap-frontend"
+  count  = local.iap_enabled ? 1 : 0
+
+  project_id            = var.project_id
+  region                = var.region
+  environment           = var.environment
+  domain                = var.domain
+  frontend_service_name = module.cloud_run_frontend.service_name
+  iap_members           = var.iap_members
+
+  depends_on = [module.cloud_run_frontend, google_project_service.apis]
+}
+
+module "api_gateway" {
+  source = "./modules/api-gateway"
+  count  = local.iap_enabled ? 1 : 0
+
+  project_id        = var.project_id
+  region            = var.region
+  environment       = var.environment
+  backend_url       = module.cloud_run_rag.service_url
+  frontend_sa_email = module.iam.frontend_sa_email
+  gateway_sa_email  = module.iam.gateway_sa_email
+
+  depends_on = [module.cloud_run_rag, module.iam, google_project_service.apis]
 }
