@@ -52,3 +52,21 @@ variable "bigquery_metrics_dataset" {
   type        = string
   default     = ""
 }
+
+variable "gcs_uploads_bucket" {
+  description = "GCS bucket for file uploads (Phase 5)"
+  type        = string
+  default     = ""
+}
+
+variable "bigquery_observability_dataset" {
+  description = "Observability BigQuery dataset ID for upload status and dashboard (Phase 5)"
+  type        = string
+  default     = ""
+}
+
+variable "frontend_sa_email" {
+  description = "Frontend service account email for invoker binding (Phase 5)"
+  type        = string
+  default     = ""
+}

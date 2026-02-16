@@ -7,18 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-15
+
 ### Added
 
+- Next.js 15 frontend deployed on Cloud Run with dark ops-style theme (slate-950/emerald/amber)
+- Chat page: streaming SSE with tool call indicators, source citations, query mode badges, model/latency metadata
+- Upload page: drag-and-drop file upload to GCS via backend proxy, ingestion status polling (3s interval, 60s timeout), recent ingestions table
+- Dashboard page: metric cards (services up, uptime %, queries, latency) + 5 data tables (service health, uptime summary, resource utilization, query activity, recent ingestions)
+- Server-side proxy route handlers with `google-auth-library` ID token auth — no CORS issues, no tokens exposed to browser
+- Backend: `POST /api/upload` — multipart upload to GCS with unique object keys (`uploads/YYYY/MM/DD/<uuid>-<safe_name>`), filename sanitization, extension/size validation
+- Backend: `GET /api/upload/status` — ingestion status from BigQuery (`processing`/`success`/`error`)
+- Backend: `GET /api/upload/recent` — 20 most recent ingestion events
+- Backend: `GET /api/dashboard/overview` — 5 aggregated BigQuery queries with partial failure resilience (each section returns `[]` independently)
+- Per-IP sliding window rate limiter (`RateLimitMiddleware`): upload 5 req/min, chat 20 req/min, returns 429 with `Retry-After` header
+- Terraform `cloud-run-frontend` module: Cloud Run v2, Gen2 execution, 0-2 instances, unauthenticated (`allUsers` invoker for Phase 5A, IAP deferred to 5B)
+- Terraform: `labsight-frontend` service account, RAG uploads writer IAM binding, frontend invoker binding on RAG service
 - SQL policy settings hardening: `sql_policy_mode` now validated as `strict|flex` at config load
 - Fail-fast startup validation: strict mode now requires non-empty `LABSIGHT_SQL_ALLOWED_TABLES`
 - Defensive SQL validator guards for unknown policy mode and strict-empty allowlist direct callers
-- SQL blocked-function normalization covers both namespaced and typed sqlglot nodes (for example `ML.PREDICT` parsed as `Predict`)
-- Regression tests for policy validation and typed ML function blocking
+- SQL blocked-function normalization covers both namespaced and typed sqlglot nodes
+- 29 backend tests (upload, dashboard, rate limiting) + 23 frontend tests (components, route handlers)
+- Makefile targets: `dev-frontend`, `test-frontend`, `build-frontend`, `deploy-frontend`, `install-frontend`
+- Streaming chat now applies SSE `sources` events in the frontend so citations render during stream mode
+- Tool call indicator mappings now include LangGraph-emitted tool names (`query_infrastructure_metrics`, `search_documents`)
 
 ### Changed
 
-- Test suite snapshot now 119 service tests + 37 ingestion tests (156 total)
-- README setup command now installs both service and ingestion dependencies before `make test`
+- Test suite snapshot now 148 service tests + 37 ingestion tests + 23 frontend tests (208 total)
+- RAG service version bumped to 0.5.0
+- `.env.example` updated with `LABSIGHT_GCS_UPLOADS_BUCKET` and `LABSIGHT_BIGQUERY_OBSERVABILITY_DATASET`
+- README architecture diagram updated with frontend + upload flow
+- `make test` now runs ingestion, service, and frontend test suites
+- README quickstart now installs frontend dependencies before running `make test`
+- Query mode badges are now color-coded by mode (`rag`/`metrics`/`hybrid`) in chat metadata
+- Frontend `UploadStatusResponse` typing aligned to implemented backend states (`processing`/`success`/`error`)
+- Documentation sync for Phase 5A: frontend public (`allUsers`) posture, upload status contract, and filename sanitization behavior
+
+### Fixed
+
+- Rate limiter now matches exact paths instead of prefixes, preventing `/api/upload/status` and `/api/upload/recent` from being throttled by `/api/upload` limits
+- Upload status polling now handles non-2xx and malformed payloads safely (no UI crash path)
+- Status badge rendering now guards null/undefined status values
+- Dotless filename handling fixed so allowlisted `Dockerfile` uploads are accepted while unknown dotless names remain rejected
 
 ## [0.4.0] - 2026-02-15
 
@@ -128,7 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Billing budget alert at $25 threshold
 - `.gitignore`, `.env.example`, `Makefile` with Terraform targets
 
-[Unreleased]: https://github.com/smatilho/labsight/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/smatilho/labsight/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/smatilho/labsight/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/smatilho/labsight/releases/tag/v0.4.0
 [0.3.0]: https://github.com/smatilho/labsight/releases/tag/v0.3.0
 [0.2.0]: https://github.com/smatilho/labsight/releases/tag/v0.2.0

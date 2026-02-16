@@ -1,6 +1,8 @@
 .PHONY: tf-init tf-plan tf-apply tf-destroy tf-fmt tf-validate tf-output \
-       test test-ingestion test-service logs-function test-upload \
+       test test-ingestion test-service test-frontend \
        dev-service build-service deploy-service \
+       dev-frontend install-frontend build-frontend deploy-frontend \
+       logs-function test-upload \
        seed-metrics test-router-accuracy
 
 PYTHON ?= python3
@@ -31,13 +33,16 @@ tf-output:
 
 # --- Testing ---
 
-test: test-ingestion test-service
+test: test-ingestion test-service test-frontend
 
 test-ingestion:
 	$(PYTHON) -m pytest ingestion/tests/ -v --cov=ingestion --cov-report=term-missing
 
 test-service:
 	PYTHONPATH=service $(PYTHON) -m pytest service/tests/ -v
+
+test-frontend:
+	cd frontend && npm test
 
 # --- Phase 2: Ingestion ---
 
@@ -68,3 +73,20 @@ seed-metrics:
 
 test-router-accuracy:
 	$(PYTHON) scripts/test_router_accuracy.py
+
+# --- Phase 5: Frontend ---
+
+install-frontend:
+	cd frontend && npm ci
+
+dev-frontend:
+	cd frontend && npm run dev
+
+build-frontend:
+	docker build -t labsight-frontend frontend/
+
+deploy-frontend:
+	$(eval REGISTRY := $(shell cd $(TF_DIR) && terraform output -raw docker_registry_url))
+	docker build -t $(REGISTRY)/frontend:latest frontend/
+	docker push $(REGISTRY)/frontend:latest
+	cd $(TF_DIR) && terraform apply -target=module.cloud_run_frontend

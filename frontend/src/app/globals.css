@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-ops-bg text-ops-text antialiased;
+}
+
+/* Scrollbar styling for the dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-ops-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-ops-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-ops-muted;
+}

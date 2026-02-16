@@ -4,73 +4,49 @@ AI-powered operations assistant for self-hosted infrastructure. Ingests real hom
 
 ## What Is This?
 
-Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with metrics analysis via a tool-using agent. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. A heuristic router classifies queries as documentation, metrics, or hybrid — documentation queries use a RAG chain with citations, while metrics and hybrid queries are dispatched to a LangGraph ReAct agent with tools for BigQuery SQL execution and vector retrieval. Every query is logged to BigQuery with router confidence scores for observability. All infrastructure is Terraform-managed.
+Labsight is an AIOps platform built on GCP that combines document retrieval (RAG) with metrics analysis via a tool-using agent. Upload your homelab docs — markdown runbooks, docker-compose files, config files — and Labsight sanitizes sensitive data, chunks intelligently by file type, embeds with Vertex AI, and stores vectors in ChromaDB for retrieval. A heuristic router classifies queries as documentation, metrics, or hybrid — documentation queries use a RAG chain with citations, while metrics and hybrid queries are dispatched to a LangGraph ReAct agent with tools for BigQuery SQL execution and vector retrieval. Every query is logged to BigQuery with router confidence scores for observability. A Next.js frontend provides a streaming chat interface, file upload with ingestion status, and a dashboard with live BigQuery-backed metrics. All infrastructure is Terraform-managed.
 
 ## Architecture
 
 ```
-                         ┌─────────────────────┐
-                         │   GCS Uploads Bucket │
-                         │  (labsight-uploads)  │
-                         └──────────┬───────────┘
-                                    │ object.finalized
-                                    ▼
-                         ┌─────────────────────┐
-                         │   Cloud Function     │
-                         │  (document-ingestion)│
-                         └──────────┬───────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-             ┌────────────┐ ┌────────────┐ ┌──────────────┐
-             │ Sanitizer  │ │  Chunker   │ │   Embedder   │
-             │ Strip IPs, │ │ MD/YAML/   │ │  Vertex AI   │
-             │ secrets    │ │ config/    │ │  text-embed  │
-             │            │ │ fallback   │ │  -004        │
-             └────────────┘ └────────────┘ └──────┬───────┘
-                                                   │
-                              ┌────────────────────┼──────────────┐
-                              ▼                                   ▼
-                    ┌──────────────────┐               ┌─────────────────┐
-                    │    ChromaDB      │               │    BigQuery     │
-                    │  (Cloud Run,     │◄──────┐       │  ingestion_log  │
-                    │   GCS-backed)    │       │       │  query_log      │
-                    └──────────────────┘       │       │  (observability)│
-                                               │       └────────┬────────┘
-                                               │                │
-                                    ┌──────────┴────────────────┘
-                                    │
-                         ┌──────────┴──────────┐
-                         │  Cloud Run          │
-                         │  (RAG Service)      │
-                         │  FastAPI + LangGraph│
-                         │                     │
-                         │  ┌─ Query Router    │
-                         │  │  (heuristic)     │
-                         │  │                  │
-                         │  ├─ "rag" ──────────┤──► RAG Chain (citations)
-                         │  │                  │
-                         │  ├─ "metrics" ──────┤──► LangGraph ReAct Agent
-                         │  │                  │    ├─ BigQuery SQL Tool
-                         │  └─ "hybrid" ───────┤    └─ Vector Retrieval Tool
-                         │                     │
-                         │  ├─ Input Validator │
-                         │  └─ Query Logger    │
-                         └──────────┬──────────┘
-                                    │
-                    ┌───────────────┼───────────────┐
-                    ▼               │               ▼
-         ┌─────────────────┐       │    ┌─────────────────────┐
-         │  LLM Provider   │       │    │  BigQuery            │
-         │ (model-agnostic)│       │    │  infrastructure_     │
-         │                 │       │    │  metrics (read-only) │
-         │ Vertex AI       │       │    │  ├─ uptime_events    │
-         │ OR OpenRouter   │       │    │  ├─ resource_util    │
-         └─────────────────┘       │    │  └─ service_inventory│
-                                   │    └─────────────────────┘
-                                   ▼
-                         platform_observability
-                         (query_log + router_confidence)
+Browser (public)
+    │
+    ▼
+┌──────────────────────┐
+│  Cloud Run           │
+│  (Next.js Frontend)  │──── server-side proxy (ID token auth) ───┐
+│  /chat, /upload,     │                                           │
+│  /dashboard          │                                           │
+└──────────────────────┘                                           │
+                                                                   ▼
+                         ┌─────────────────────┐        ┌──────────────────────┐
+                         │   GCS Uploads Bucket │        │  Cloud Run           │
+                         │  (labsight-uploads)  │◄───────│  (RAG Service)       │
+                         └──────────┬───────────┘  file  │  FastAPI + LangGraph │
+                                    │ object.       upload│                     │
+                                    │ finalized          │  ┌─ Query Router     │
+                                    ▼                    │  │  (heuristic)      │
+                         ┌─────────────────────┐        │  │                   │
+                         │   Cloud Function     │        │  ├─ "rag" ───────────┤──► RAG Chain
+                         │  (document-ingestion)│        │  │                   │
+                         └──────────┬───────────┘        │  ├─ "metrics" ───────┤──► LangGraph Agent
+                                    │                    │  │                   │    ├─ BigQuery SQL
+                    ┌───────────────┼───────────┐        │  └─ "hybrid" ────────┤    └─ Vector Search
+                    ▼               ▼           ▼        │                     │
+             ┌────────────┐ ┌──────────┐ ┌──────────┐   │  ├─ Input Validator  │
+             │ Sanitizer  │ │ Chunker  │ │ Embedder │   │  ├─ Rate Limiter     │
+             └────────────┘ └──────────┘ └────┬─────┘   │  └─ Query Logger     │
+                                              │          └──────────┬──────────┘
+                              ┌───────────────┼──────┐              │
+                              ▼                      ▼    ┌─────────┼────────┐
+                    ┌──────────────────┐      ┌──────────┐│         ▼        │
+                    │    ChromaDB      │      │ BigQuery  ││  LLM Provider   │
+                    │  (Cloud Run,     │      │ ingestion_││ (model-agnostic)│
+                    │   GCS-backed)    │      │ log       ││                 │
+                    └──────────────────┘      │ query_log ││ Vertex AI       │
+                                              │ infra     ││ OR OpenRouter   │
+                                              │ metrics   │└─────────────────┘
+                                              └──────────┘
 ```
 
 ## Tech Stack
@@ -78,6 +54,7 @@ Labsight is an AIOps platform built on GCP that combines document retrieval (RAG
 | Layer | Technology |
 |---|---|
 | Infrastructure | Terraform (HCL), GCP |
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
 | RAG Service | FastAPI, LangChain, Cloud Run (Python 3.12) |
 | Agent | LangGraph ReAct agent (langgraph.prebuilt) |
 | Query Router | Heuristic classifier with confidence scoring (~1ms, no LLM) |
@@ -128,9 +105,13 @@ labsight/
 │   │   ├── main.py                # FastAPI app factory (lifespan)
 │   │   ├── config.py              # Pydantic settings (LABSIGHT_ prefix)
 │   │   ├── utils.py               # Shared SSE helper
+│   │   ├── middleware/
+│   │   │   └── rate_limit.py      # Per-IP sliding window rate limiter
 │   │   ├── routers/
 │   │   │   ├── chat.py            # /api/chat (routes by query classification)
-│   │   │   └── health.py          # /api/health
+│   │   │   ├── health.py          # /api/health
+│   │   │   ├── upload.py          # /api/upload, /api/upload/status, /api/upload/recent
+│   │   │   └── dashboard.py       # /api/dashboard/overview
 │   │   ├── agent/
 │   │   │   ├── router.py          # Heuristic query router (rag/metrics/hybrid)
 │   │   │   ├── graph.py           # LangGraph ReAct agent
@@ -149,17 +130,23 @@ labsight/
 │   │   └── observability/
 │   │       └── logger.py          # BigQuery query logging + router_confidence
 │   └── tests/
-│       ├── conftest.py
-│       ├── test_agent.py
-│       ├── test_bigquery_tool.py
-│       ├── test_chain.py
-│       ├── test_chat.py
-│       ├── test_health.py
-│       ├── test_input_validator.py
-│       ├── test_llm_providers.py
-│       ├── test_retriever.py
-│       ├── test_router.py
-│       └── test_vector_tool.py
+│
+├── frontend/                      # Next.js frontend (Cloud Run)
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── next.config.ts
+│   ├── tailwind.config.ts
+│   └── src/
+│       ├── app/
+│       │   ├── layout.tsx         # Root layout + NavBar (dark ops theme)
+│       │   ├── chat/page.tsx      # Chat UI with SSE streaming
+│       │   ├── upload/page.tsx    # Drag-and-drop upload + status polling
+│       │   ├── dashboard/page.tsx # Metrics cards + data tables
+│       │   └── api/               # Server-side proxy route handlers
+│       ├── components/            # UI components
+│       └── lib/
+│           ├── backend.ts         # ID token auth + fetch wrapper
+│           └── types.ts           # TypeScript interfaces
 │
 ├── scripts/                       # Development utilities
 │   ├── seed_metrics.py            # Seed BigQuery with synthetic metrics data
@@ -177,7 +164,8 @@ labsight/
 │       ├── bigquery/              # Observability + infrastructure_metrics datasets
 │       ├── chromadb/              # ChromaDB Cloud Run service
 │       ├── cloud-functions/       # Ingestion function
-│       └── cloud-run-rag/         # RAG service (Cloud Run + Secret Manager)
+│       ├── cloud-run-rag/         # RAG service (Cloud Run + Secret Manager)
+│       └── cloud-run-frontend/    # Frontend (Cloud Run, unauthenticated)
 │
 ├── Makefile
 ├── CHANGELOG.md
@@ -189,6 +177,7 @@ labsight/
 - GCP project with billing enabled
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5
 - Python 3.12+
+- Node.js 20+
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) authenticated (`gcloud auth application-default login`)
 
 ## Getting Started
@@ -210,6 +199,7 @@ terraform apply   # Deploy (requires approval)
 cd ..
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r service/requirements.txt -r ingestion/requirements.txt pytest pytest-asyncio pytest-cov
+make install-frontend  # required because `make test` includes frontend tests
 make test
 
 # Upload a test document (after infra is deployed)
@@ -222,8 +212,16 @@ make seed-metrics
 make build-service
 make deploy-service
 
+# Build and deploy frontend
+make build-frontend
+make deploy-frontend
+
 # Run router accuracy check
 make test-router-accuracy
+
+# Local development
+make dev-service     # Backend on :8080
+make dev-frontend    # Frontend on :3000
 
 # Check logs
 make logs-function
@@ -235,7 +233,8 @@ make logs-function
 - [x] **Phase 2:** Document ingestion pipeline — sanitizer, chunker, embedder, Cloud Function
 - [x] **Phase 3:** Core RAG service — FastAPI, model abstraction, retrieval chain, citations, streaming
 - [x] **Phase 4:** Agent + BigQuery — heuristic router, LangGraph ReAct agent, BigQuery SQL tool, infrastructure_metrics dataset
-- [ ] **Phase 5:** Frontend — Next.js chat UI, upload interface, dashboard
+- [x] **Phase 5A:** Frontend — Next.js chat UI (streaming SSE), file upload, dashboard, rate limiting
+- [ ] **Phase 5B:** IAP + API Gateway — identity-aware proxy, rate limiting at edge
 - [ ] **Phase 6:** RAG tuning — cross-encoder re-ranking, HNSW benchmarking
 - [ ] **Phase 7:** Guardrails, ADK evaluation, CI/CD, polish
 

@@ -16,9 +16,10 @@ from fastapi import FastAPI
 
 from app.config import Settings
 from app.llm.provider import create_provider
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.rag.chain import RAGChain
 from app.rag.retriever import ChromaDBRetriever
-from app.routers import chat, health
+from app.routers import chat, dashboard, health, upload
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,9 +80,22 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Labsight RAG Service",
         description="AI-powered operations assistant for homelab infrastructure",
-        version="0.4.0",
+        version="0.5.0",
         lifespan=lifespan,
     )
+
+    # Rate limiting — lightweight defense until IAP in Phase 5B
+    settings = Settings()
+    app.add_middleware(
+        RateLimitMiddleware,
+        rules={
+            "/api/upload": settings.rate_limit_upload_per_min,
+            "/api/chat": settings.rate_limit_chat_per_min,
+        },
+    )
+
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(upload.router)
+    app.include_router(dashboard.router)
     return app

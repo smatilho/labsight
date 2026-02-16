@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     bigquery_metrics_dataset: str = ""
     bigquery_max_bytes_billed: int = 100_000_000
 
+    # Phase 5: Upload + Dashboard
+    gcs_uploads_bucket: str = ""
+    bigquery_observability_dataset: str = ""
+    max_upload_size_bytes: int = 10_485_760  # 10 MB
+    allowed_upload_extensions: str = (
+        "md,yaml,yml,json,txt,conf,cfg,ini,toml,dockerfile,sh,xml,csv,properties"
+    )
+
+    # Rate limiting (in-memory sliding window, per client IP)
+    rate_limit_chat_per_min: int = 20
+    rate_limit_upload_per_min: int = 5
+
     # SQL policy: "strict" requires fully-qualified table names from the
     # allowed list; "flex" allows unqualified and table-less queries (dev use)
     sql_policy_mode: Literal["strict", "flex"] = "strict"
@@ -69,4 +81,12 @@ class Settings(BaseSettings):
         """Parse sql_allowed_tables into a frozenset for use by the SQL validator."""
         return frozenset(
             t.strip() for t in self.sql_allowed_tables.split(",") if t.strip()
+        )
+
+    def get_allowed_extensions_set(self) -> frozenset[str]:
+        """Parse allowed_upload_extensions into a frozenset."""
+        return frozenset(
+            ext.strip().lower()
+            for ext in self.allowed_upload_extensions.split(",")
+            if ext.strip()
         )

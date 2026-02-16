@@ -105,14 +105,32 @@ module "cloud_functions" {
 module "cloud_run_rag" {
   source = "./modules/cloud-run-rag"
 
-  project_id               = var.project_id
-  region                   = var.region
-  environment              = var.environment
-  rag_service_sa_email     = module.iam.rag_service_sa_email
-  image                    = "${module.gcs.docker_registry_url}/rag-service:latest"
-  chromadb_url             = module.chromadb.service_url
-  bigquery_query_log_table = module.bigquery.query_log_table_id
-  bigquery_metrics_dataset = module.bigquery.infra_metrics_dataset_id
+  project_id                     = var.project_id
+  region                         = var.region
+  environment                    = var.environment
+  rag_service_sa_email           = module.iam.rag_service_sa_email
+  image                          = "${module.gcs.docker_registry_url}/rag-service:latest"
+  chromadb_url                   = module.chromadb.service_url
+  bigquery_query_log_table       = module.bigquery.query_log_table_id
+  bigquery_metrics_dataset       = module.bigquery.infra_metrics_dataset_id
+  gcs_uploads_bucket             = module.gcs.uploads_bucket_name
+  bigquery_observability_dataset = module.bigquery.dataset_id
+  frontend_sa_email              = module.iam.frontend_sa_email
 
   depends_on = [module.chromadb, module.bigquery, module.iam, module.gcs]
+}
+
+# --- Phase 5: Frontend ---
+
+module "cloud_run_frontend" {
+  source = "./modules/cloud-run-frontend"
+
+  project_id        = var.project_id
+  region            = var.region
+  environment       = var.environment
+  frontend_sa_email = module.iam.frontend_sa_email
+  image             = "${module.gcs.docker_registry_url}/frontend:latest"
+  backend_url       = module.cloud_run_rag.service_url
+
+  depends_on = [module.cloud_run_rag, module.iam, module.gcs]
 }

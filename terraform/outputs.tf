@@ -73,3 +73,15 @@ output "bigquery_infra_metrics_dataset" {
   description = "Infrastructure metrics BigQuery dataset ID"
   value       = module.bigquery.infra_metrics_dataset_id
 }
+
+# --- Phase 5 outputs ---
+
+output "frontend_service_url" {
+  description = "Frontend Cloud Run service URL"
+  value       = module.cloud_run_frontend.service_url
+}
+
+output "frontend_sa_email" {
+  description = "Frontend service account email"
+  value       = module.iam.frontend_sa_email
+}

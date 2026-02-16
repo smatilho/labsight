@@ -121,6 +121,28 @@ resource "google_cloud_run_v2_service" "rag_service" {
         name  = "LABSIGHT_BIGQUERY_METRICS_DATASET"
         value = var.bigquery_metrics_dataset
       }
+
+      env {
+        name  = "LABSIGHT_GCS_UPLOADS_BUCKET"
+        value = var.gcs_uploads_bucket
+      }
+
+      env {
+        name  = "LABSIGHT_BIGQUERY_OBSERVABILITY_DATASET"
+        value = var.bigquery_observability_dataset
+      }
     }
   }
+}
+
+# --- Phase 5: Frontend SA invoker binding ---
+# Kept in the RAG module so all RAG service IAM lives in one place.
+
+resource "google_cloud_run_v2_service_iam_member" "frontend_invoker" {
+  count    = var.frontend_sa_email != "" ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.rag_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.frontend_sa_email}"
 }

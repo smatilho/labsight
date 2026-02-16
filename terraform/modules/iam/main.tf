@@ -80,6 +80,23 @@ resource "google_project_iam_member" "rag_bq_job_user" {
   member  = "serviceAccount:${google_service_account.rag_service.email}"
 }
 
+# --- Phase 5: Frontend service account ---
+
+resource "google_service_account" "frontend" {
+  account_id   = "labsight-frontend"
+  display_name = "Labsight Frontend"
+  description  = "Next.js frontend service that proxies to the RAG backend"
+  project      = var.project_id
+}
+
+# RAG service needs to write uploads to GCS
+resource "google_storage_bucket_iam_member" "rag_uploads_writer" {
+  count  = var.uploads_bucket_name != "" ? 1 : 0
+  bucket = var.uploads_bucket_name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.rag_service.email}"
+}
+
 # --- Phase 4: Read-only access to infrastructure metrics for agent queries ---
 
 resource "google_bigquery_dataset_iam_member" "rag_infra_metrics_viewer" {
