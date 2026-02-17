@@ -57,6 +57,16 @@ output "bigquery_query_log_table" {
   value       = module.bigquery.query_log_table_id
 }
 
+output "bigquery_retrieval_eval_runs_table" {
+  description = "Fully-qualified retrieval_eval_runs table ID"
+  value       = module.bigquery.retrieval_eval_runs_table_id
+}
+
+output "bigquery_retrieval_eval_query_results_table" {
+  description = "Fully-qualified retrieval_eval_query_results table ID"
+  value       = module.bigquery.retrieval_eval_query_results_table_id
+}
+
 output "rag_service_url" {
   description = "RAG service Cloud Run URL"
   value       = module.cloud_run_rag.service_url

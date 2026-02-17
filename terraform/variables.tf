@@ -75,3 +75,35 @@ variable "frontend_public" {
   type        = bool
   default     = false
 }
+
+# --- Phase 6: Retrieval tuning ---
+
+variable "retrieval_candidate_k" {
+  description = "Number of ANN candidates retrieved from ChromaDB before reranking"
+  type        = number
+  default     = 20
+}
+
+variable "retrieval_final_k" {
+  description = "Number of documents passed to generation after reranking"
+  type        = number
+  default     = 5
+}
+
+variable "rerank_enabled" {
+  description = "Enable cross-encoder reranking in the RAG service"
+  type        = bool
+  default     = false
+}
+
+variable "reranker_model" {
+  description = "Cross-encoder model identifier for reranking"
+  type        = string
+  default     = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+}
+
+variable "reranker_max_candidates" {
+  description = "Maximum candidate docs scored by the reranker"
+  type        = number
+  default     = 30
+}

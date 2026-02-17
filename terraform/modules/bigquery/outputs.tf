@@ -13,6 +13,16 @@ output "query_log_table_id" {
   value       = "${var.project_id}.${google_bigquery_dataset.platform_observability.dataset_id}.${google_bigquery_table.query_log.table_id}"
 }
 
+output "retrieval_eval_runs_table_id" {
+  description = "Fully-qualified retrieval_eval_runs table ID (project.dataset.table)"
+  value       = "${var.project_id}.${google_bigquery_dataset.platform_observability.dataset_id}.${google_bigquery_table.retrieval_eval_runs.table_id}"
+}
+
+output "retrieval_eval_query_results_table_id" {
+  description = "Fully-qualified retrieval_eval_query_results table ID (project.dataset.table)"
+  value       = "${var.project_id}.${google_bigquery_dataset.platform_observability.dataset_id}.${google_bigquery_table.retrieval_eval_query_results.table_id}"
+}
+
 # --- Phase 4 outputs ---
 
 output "infra_metrics_dataset_id" {

@@ -9,6 +9,12 @@ interface SourceCardProps {
 
 export default function SourceCard({ source }: SourceCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const rawLabel =
+    source.metadata.source || source.metadata.filename || "unknown source";
+  const label =
+    typeof rawLabel === "string"
+      ? rawLabel.split("/").pop() || rawLabel
+      : "unknown source";
 
   return (
     <div className="border border-ops-border/50 rounded bg-ops-bg p-2">
@@ -16,12 +22,12 @@ export default function SourceCard({ source }: SourceCardProps) {
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 w-full text-left text-xs"
       >
-        <span className="text-ops-muted">#{source.index + 1}</span>
+        <span className="text-ops-muted">#{source.index}</span>
         <span className="text-ops-green font-mono">
           {(source.similarity_score * 100).toFixed(0)}%
         </span>
         <span className="text-ops-muted truncate flex-1">
-          {source.metadata.source || "unknown source"}
+          {label}
         </span>
         <span className="text-ops-muted">{expanded ? "▲" : "▼"}</span>
       </button>

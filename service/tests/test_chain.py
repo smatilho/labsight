@@ -80,6 +80,51 @@ class TestRAGChainInvoke:
         # LLM should NOT be called when there are no documents
         mock_llm.invoke.assert_not_called()
 
+    def test_uses_reranked_document_order(
+        self, mock_retriever: MagicMock, mock_llm: MagicMock
+    ) -> None:
+        class ReverseReranker:
+            def rerank(self, query: str, docs: list[Document], top_k: int) -> list[Document]:
+                del query
+                return list(reversed(docs))[:top_k]
+
+        chain = RAGChain(
+            retriever=mock_retriever,
+            llm=mock_llm,
+            model_name="test/model",
+            reranker=ReverseReranker(),
+            retrieval_final_k=2,
+        )
+        chain.invoke("Where does AdGuard run?")
+
+        # Ensure reranked order is what gets sent to the LLM context.
+        messages = mock_llm.invoke.call_args.args[0]
+        assert "DNS rewrites point *.lab.atilho.com" in messages[1].content
+        assert "AdGuard runs on CT 102" in messages[1].content
+
+    def test_reranker_failure_falls_back_to_ann_order(
+        self, mock_retriever: MagicMock, mock_llm: MagicMock
+    ) -> None:
+        class BrokenReranker:
+            def rerank(self, query: str, docs: list[Document], top_k: int) -> list[Document]:
+                del query, docs, top_k
+                raise RuntimeError("reranker exploded")
+
+        chain = RAGChain(
+            retriever=mock_retriever,
+            llm=mock_llm,
+            model_name="test/model",
+            reranker=BrokenReranker(),
+            retrieval_final_k=2,
+        )
+        result = chain.invoke("Where does AdGuard run?")
+
+        assert result.retrieval_count == 2
+        messages = mock_llm.invoke.call_args.args[0]
+        # Falls back to retriever order (doc1 first, doc2 second).
+        assert "AdGuard runs on CT 102" in messages[1].content
+        assert "DNS rewrites point *.lab.atilho.com" in messages[1].content
+
 
 class TestRAGChainStream:
     @pytest.mark.asyncio

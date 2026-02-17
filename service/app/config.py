@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     openrouter_model: str = "anthropic/claude-sonnet-4-20250514"
 
     # RAG tuning
-    retrieval_top_k: int = 5
+    retrieval_candidate_k: int = 20
+    retrieval_final_k: int = 5
+    rerank_enabled: bool = False
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_max_candidates: int = 30
 
     # Input validation
     max_query_length: int = 1000
@@ -67,6 +71,14 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_sql_policy(self) -> "Settings":
         """Strict SQL policy requires a non-empty table allowlist."""
+        if self.retrieval_final_k <= 0:
+            raise ValueError("retrieval_final_k must be greater than 0.")
+
+        if self.retrieval_candidate_k < self.retrieval_final_k:
+            raise ValueError(
+                "retrieval_candidate_k must be >= retrieval_final_k."
+            )
+
         if self.sql_policy_mode == "strict":
             tables = [t.strip() for t in self.sql_allowed_tables.split(",") if t.strip()]
             if not tables:

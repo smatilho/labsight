@@ -12,3 +12,10 @@ budget_amount      = 50
 # iap_oauth_client_id      = "1234567890-abc123.apps.googleusercontent.com"
 # iap_oauth_client_secret  = "GOCSPX-..."
 # frontend_public          = false
+
+# Phase 6 (optional)
+# retrieval_candidate_k    = 20
+# retrieval_final_k        = 5
+# rerank_enabled           = false
+# reranker_model           = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+# reranker_max_candidates  = 30

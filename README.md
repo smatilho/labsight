@@ -70,6 +70,7 @@ Phase 5B is conditional. Set `TF_VAR_domain` to enable the IAP + API Gateway pat
 | RAG Service | FastAPI, LangChain, Cloud Run (Python 3.12) |
 | Agent | LangGraph ReAct agent (langgraph.prebuilt) |
 | Query Router | Heuristic classifier with confidence scoring (~1ms, no LLM) |
+| Retrieval Tuning | Candidate-depth retrieval + optional cross-encoder rerank + evaluation harness |
 | SQL Validation | sqlglot AST parser (strict/flex policy, table allowlist, fail-fast config) |
 | Document Ingestion | Cloud Functions Gen 2 (Python 3.12) |
 | Data Sanitization | Regex-based IP/secret redaction |
@@ -132,6 +133,7 @@ labsight/
 │   │   │       └── vector_retrieval.py # ChromaDB search tool
 │   │   ├── rag/
 │   │   │   ├── retriever.py       # ChromaDB retriever (LangChain BaseRetriever)
+│   │   │   ├── reranker.py        # No-op + cross-encoder rerankers
 │   │   │   └── chain.py           # RAG chain with [Source N] citations
 │   │   ├── llm/
 │   │   │   ├── provider.py        # Model-agnostic interface + factory
@@ -162,7 +164,10 @@ labsight/
 │
 ├── scripts/                       # Development utilities
 │   ├── seed_metrics.py            # Seed BigQuery with synthetic metrics data
-│   └── test_router_accuracy.py    # Golden query set for router accuracy
+│   ├── test_router_accuracy.py    # Golden query set for router accuracy
+│   ├── eval_retrieval.py          # Phase 6 golden-query retrieval evaluation
+│   ├── benchmark_retrieval.py     # Candidate/final-k + reranker sweep benchmark
+│   └── benchmark_hnsw.py          # HNSW profile benchmark (local clone of Chroma corpus)
 │
 ├── terraform/                     # All GCP infrastructure
 │   ├── main.tf                    # Provider config, module wiring
@@ -190,6 +195,7 @@ labsight/
 
 - GCP project with billing enabled
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5
+- Docker with Buildx support (`docker buildx version`)
 - Python 3.12+
 - Node.js 20+
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) authenticated (`gcloud auth application-default login`)
@@ -224,6 +230,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r service/requirements.txt -r ingestion/requirements.txt pytest pytest-asyncio pytest-cov
 make install-frontend  # required because `make test` includes frontend tests
 make test
+# If pytest-cov is missing locally, `make test-ingestion` auto-falls back to non-coverage mode.
 
 # Upload a test document (after infra is deployed)
 make test-upload
@@ -234,13 +241,26 @@ make seed-metrics
 # Build and deploy the RAG service
 make build-service
 make deploy-service
+# macOS/Apple Silicon: deploy target uses buildx with linux/amd64 by default.
+# Non-interactive apply:
+#   make deploy-service TF_AUTO_APPROVE=true
 
 # Build and deploy frontend
 make build-frontend
 make deploy-frontend
+# Non-interactive apply:
+#   make deploy-frontend TF_AUTO_APPROVE=true
 
 # Run router accuracy check
 make test-router-accuracy
+
+# Phase 6 retrieval tuning
+make eval-retrieval
+make benchmark-retrieval
+make benchmark-hnsw
+
+# Optional: cross-encoder reranker runtime dependency
+# pip install sentence-transformers
 
 # Local development
 make dev-service     # Backend on :8080
@@ -261,6 +281,7 @@ make logs-function
 - `FAILED_NOT_VISIBLE` on managed cert: DNS is not publicly visible to Google yet (or proxied). Verify `dig` against `1.1.1.1` and `8.8.8.8`.
 - `Empty Google Account OAuth client ID(s)/secret(s).`: backend service has IAP enabled but no OAuth client configured. Set `iap_oauth_client_id` and `iap_oauth_client_secret`.
 - `The IAP service account is not provisioned.`: ensure Terraform applied successfully after enabling IAP APIs so the service identity + invoker binding resources are created.
+- `Container manifest type ... must support amd64/linux`: image was built for the wrong architecture. Use buildx (`linux/amd64`) for Cloud Run images (default in current `make deploy-*` targets).
 
 ## Roadmap
 
@@ -270,7 +291,7 @@ make logs-function
 - [x] **Phase 4:** Agent + BigQuery — heuristic router, LangGraph ReAct agent, BigQuery SQL tool, infrastructure_metrics dataset
 - [x] **Phase 5A:** Frontend — Next.js chat UI (streaming SSE), file upload, dashboard, rate limiting
 - [x] **Phase 5B:** IAP + API Gateway — identity-aware proxy, API key auth, managed SSL
-- [ ] **Phase 6:** RAG tuning — cross-encoder re-ranking, HNSW benchmarking
+- [x] **Phase 6:** RAG tuning — retrieval eval harness, BigQuery experiment logging, candidate-depth + HNSW benchmarking scaffolding
 - [ ] **Phase 7:** Guardrails, ADK evaluation, CI/CD, polish
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.

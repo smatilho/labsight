@@ -67,6 +67,9 @@ class TestChromaDBRetriever:
         assert "similarity_score" in docs[0].metadata
         # Closer distance should yield higher similarity
         assert docs[0].metadata["similarity_score"] > docs[1].metadata["similarity_score"]
+        mock_chromadb_collection.query.assert_called_once()
+        kwargs = mock_chromadb_collection.query.call_args.kwargs
+        assert kwargs["n_results"] == retriever.settings.retrieval_candidate_k
 
     def test_retrieve_empty_results(
         self,
@@ -97,3 +100,39 @@ class TestChromaDBRetriever:
         docs = retriever.invoke("test")
         assert docs[0].metadata["similarity_score"] == 1.0
         assert docs[1].metadata["similarity_score"] < 0.02
+
+    def test_source_falls_back_to_filename(
+        self,
+        retriever: ChromaDBRetriever,
+        mock_chromadb_collection: MagicMock,
+    ) -> None:
+        mock_chromadb_collection.query.return_value = {
+            "documents": [["chunk"]],
+            "metadatas": [[{"filename": "uploads/2026/02/16/test.md"}]],
+            "distances": [[0.4]],
+        }
+
+        docs = retriever.invoke("test")
+        assert docs[0].metadata["source"] == "uploads/2026/02/16/test.md"
+        assert docs[0].metadata["source_basename"] == "test.md"
+
+    def test_falls_back_to_gcloud_identity_token_when_adc_missing(
+        self,
+        retriever: ChromaDBRetriever,
+        mock_chromadb_collection: MagicMock,
+    ) -> None:
+        mock_chromadb_collection.query.return_value = {
+            "documents": [["chunk"]],
+            "metadatas": [[{"source": "doc.md"}]],
+            "distances": [[0.5]],
+        }
+        with (
+            patch(
+                "google.oauth2.id_token.fetch_id_token",
+                side_effect=RuntimeError("adc missing"),
+            ),
+            patch("subprocess.check_output", return_value="fake-gcloud-token\n") as mock_cmd,
+        ):
+            retriever.invoke("test")
+
+        mock_cmd.assert_called_once()

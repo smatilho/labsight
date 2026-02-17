@@ -131,6 +131,31 @@ resource "google_cloud_run_v2_service" "rag_service" {
         name  = "LABSIGHT_BIGQUERY_OBSERVABILITY_DATASET"
         value = var.bigquery_observability_dataset
       }
+
+      env {
+        name  = "LABSIGHT_RETRIEVAL_CANDIDATE_K"
+        value = tostring(var.retrieval_candidate_k)
+      }
+
+      env {
+        name  = "LABSIGHT_RETRIEVAL_FINAL_K"
+        value = tostring(var.retrieval_final_k)
+      }
+
+      env {
+        name  = "LABSIGHT_RERANK_ENABLED"
+        value = lower(tostring(var.rerank_enabled))
+      }
+
+      env {
+        name  = "LABSIGHT_RERANKER_MODEL"
+        value = var.reranker_model
+      }
+
+      env {
+        name  = "LABSIGHT_RERANKER_MAX_CANDIDATES"
+        value = tostring(var.reranker_max_candidates)
+      }
     }
   }
 }

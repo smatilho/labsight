@@ -76,3 +76,33 @@ variable "gateway_sa_email" {
   type        = string
   default     = ""
 }
+
+variable "retrieval_candidate_k" {
+  description = "Phase 6 candidate retrieval depth before reranking"
+  type        = number
+  default     = 20
+}
+
+variable "retrieval_final_k" {
+  description = "Phase 6 final document count after reranking"
+  type        = number
+  default     = 5
+}
+
+variable "rerank_enabled" {
+  description = "Enable reranking in the RAG service"
+  type        = bool
+  default     = false
+}
+
+variable "reranker_model" {
+  description = "Cross-encoder model name used for reranking"
+  type        = string
+  default     = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+}
+
+variable "reranker_max_candidates" {
+  description = "Maximum documents scored by the reranker"
+  type        = number
+  default     = 30
+}

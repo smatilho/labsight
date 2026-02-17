@@ -5,22 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-02-17
 
 ### Added
 
 - IAP module now provisions the IAP service identity and frontend `roles/run.invoker` binding in Terraform (`google_project_service_identity` + `google_cloud_run_v2_service_iam_member`)
+- Phase 6 retrieval evaluation tooling:
+  - `.benchmarks/retrieval_golden.json` golden query set
+  - `scripts/eval_retrieval.py` single-run evaluation (Hit@K, MRR, latency percentiles)
+  - `scripts/benchmark_retrieval.py` candidate/final-k + reranker sweep benchmark
+  - `scripts/benchmark_hnsw.py` HNSW profile benchmark against a local clone of the Chroma corpus
+- New BigQuery observability tables for retrieval experiments:
+  - `platform_observability.retrieval_eval_runs`
+  - `platform_observability.retrieval_eval_query_results`
+- New Makefile targets for Phase 6:
+  - `eval-retrieval`
+  - `benchmark-retrieval`
+  - `benchmark-hnsw`
 
 ### Changed
 
 - Terraform now requires explicit IAP OAuth credentials in IAP mode (`iap_oauth_client_id` + `iap_oauth_client_secret`) and fails fast if they are missing
 - Terraform now requires non-empty `iap_members` when IAP mode is enabled
 - IAP setup guidance now uses Google Auth Platform OAuth client flow (`gcloud iap oauth-brands` is deprecated/non-functional for many non-org projects)
+- RAG chain retrieval flow now uses explicit candidate selection + reranker selection with automatic ANN fallback when reranker errors occur
+- Cloud Run RAG Terraform module now wires Phase 6 retrieval tuning env vars (`LABSIGHT_RETRIEVAL_CANDIDATE_K`, `LABSIGHT_RETRIEVAL_FINAL_K`, `LABSIGHT_RERANK_ENABLED`, `LABSIGHT_RERANKER_MODEL`, `LABSIGHT_RERANKER_MAX_CANDIDATES`)
+- Terraform root adds Phase 6 validation checks to prevent invalid retrieval tuning combinations (`candidate_k >= final_k`, positive final_k, reranker max bounds)
+- Retriever now caches auth tokens in-process (~50 minutes) to reduce local eval latency while still refreshing before expiry
+- Makefile deploy targets now use `docker buildx --platform linux/amd64 --push` by default for Cloud Run-compatible images on Apple Silicon and x86 hosts
+- Makefile now supports non-interactive Terraform applies via `TF_AUTO_APPROVE=true` for `tf-apply`, `deploy-service`, and `deploy-frontend`
 
 ### Fixed
 
 - IAP runtime failure `The IAP service account is not provisioned` is now prevented by Terraform-managed service identity + invoker binding
 - API Gateway managed service is now auto-enabled by Terraform to prevent `PERMISSION_DENIED: API ... is not enabled for the project` 403s
+- Source metadata normalization now handles older docs missing `source` by deriving from `filename` and exposing `source_basename`
+- Local retrieval/eval tooling now falls back from ADC to gcloud auth tokens when service account credentials are unavailable
+- `make test-ingestion` now auto-falls back to non-coverage pytest when `pytest-cov` is not installed
 
 ## [0.5.1] - 2026-02-15
 

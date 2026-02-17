@@ -1,0 +1,45 @@
+[
+  {
+    "query": "What monitoring do I have in my homelab?",
+    "expected_sources": ["monitoring-notifications-dashboard-homelab"]
+  },
+  {
+    "query": "Why did you choose Uptime Kuma instead of Grafana?",
+    "expected_sources": ["monitoring-notifications-dashboard-homelab"]
+  },
+  {
+    "query": "How did you set up your reverse proxy and TLS certificates?",
+    "expected_sources": ["reverse-proxy-tls-homelab"]
+  },
+  {
+    "query": "What subdomain structure do you use for homelab services?",
+    "expected_sources": ["reverse-proxy-tls-homelab"]
+  },
+  {
+    "query": "How is OpenClaw hosted and secured on Oracle VPS?",
+    "expected_sources": ["openclaw-oracle-vps-tailscale"]
+  },
+  {
+    "query": "How do Tailscale ACLs protect your Oracle-hosted services?",
+    "expected_sources": ["openclaw-oracle-vps-tailscale"]
+  },
+  {
+    "query": "What hardware are you running for the homelab core?",
+    "expected_sources": ["wyse-5070-homelab-proxmox-adguard-tailscale"]
+  },
+  {
+    "query": "How is AdGuard deployed in the homelab stack?",
+    "expected_sources": ["wyse-5070-homelab-proxmox-adguard-tailscale"]
+  },
+  {
+    "query": "How are notifications delivered when services fail?",
+    "expected_sources": ["monitoring-notifications-dashboard-homelab"]
+  },
+  {
+    "query": "How did you expose services securely without opening inbound ports?",
+    "expected_sources": [
+      "reverse-proxy-tls-homelab",
+      "openclaw-oracle-vps-tailscale"
+    ]
+  }
+]

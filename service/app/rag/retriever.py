@@ -13,6 +13,9 @@ the ingestion Cloud Function (ingestion/main.py:38-58).
 from __future__ import annotations
 
 import logging
+import subprocess
+import time
+from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
@@ -34,26 +37,81 @@ class ChromaDBRetriever(BaseRetriever):
 
     settings: Settings
     _embedding_model: Any = None
+    _cached_auth_token: str | None = None
+    _cached_auth_expiry_epoch: float = 0.0
 
     model_config = {"arbitrary_types_allowed": True}
 
-    def _get_client(self) -> chromadb.HttpClient:
-        """Create an authenticated ChromaDB HTTP client with a fresh ID token.
+    def _get_auth_token(self, audience_url: str) -> str:
+        """Fetch and cache an auth token for ChromaDB Cloud Run IAM."""
+        now = time.time()
+        if self._cached_auth_token and now < self._cached_auth_expiry_epoch:
+            return self._cached_auth_token
 
-        No caching — Google ID tokens expire after 1 hour and Cloud Run
-        rejects stale ones. The ~10-20ms overhead of fetching a fresh token
-        is negligible compared to embedding + LLM latency.
-        """
-        import chromadb
         import google.auth.transport.requests
         import google.oauth2.id_token
 
+        auth_req = google.auth.transport.requests.Request()
+        token: str
+
+        try:
+            token = google.oauth2.id_token.fetch_id_token(auth_req, audience_url)
+        except Exception:
+            # Local dev/eval fallback when ADC is not configured. This keeps
+            # scripts usable with gcloud user auth without weakening Cloud Run IAM.
+            logger.warning("ADC token fetch failed; falling back to gcloud auth tokens")
+            try:
+                token = (
+                    subprocess.check_output(
+                        [
+                            "gcloud",
+                            "auth",
+                            "print-identity-token",
+                            f"--audiences={audience_url}",
+                        ],
+                        text=True,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    .strip()
+                )
+            except subprocess.CalledProcessError:
+                # User credentials often cannot set custom audiences.
+                # Retry without audience and finally with OAuth access token.
+                try:
+                    token = (
+                        subprocess.check_output(
+                            ["gcloud", "auth", "print-identity-token"],
+                            text=True,
+                            stderr=subprocess.DEVNULL,
+                        )
+                        .strip()
+                    )
+                except subprocess.CalledProcessError:
+                    token = (
+                        subprocess.check_output(
+                            ["gcloud", "auth", "print-access-token"],
+                            text=True,
+                            stderr=subprocess.DEVNULL,
+                        )
+                        .strip()
+                    )
+
+        # Tokens are valid for about 1 hour; refresh conservatively.
+        self._cached_auth_token = token
+        self._cached_auth_expiry_epoch = now + (50 * 60)
+        return token
+
+    def _get_client(self) -> chromadb.HttpClient:
+        """Create an authenticated ChromaDB HTTP client.
+
+        Auth tokens are cached in-process for ~50 minutes to keep repeated
+        retrieval calls fast while still refreshing well before expiry.
+        """
+        import chromadb
         url = self.settings.chromadb_url
         host = url.replace("https://", "").replace("http://", "").rstrip("/")
         ssl = url.startswith("https")
-
-        auth_req = google.auth.transport.requests.Request()
-        id_token = google.oauth2.id_token.fetch_id_token(auth_req, url)
+        id_token = self._get_auth_token(url)
 
         return chromadb.HttpClient(
             host=host,
@@ -101,7 +159,7 @@ class ChromaDBRetriever(BaseRetriever):
 
         results = collection.query(
             query_embeddings=[query_vector],
-            n_results=self.settings.retrieval_top_k,
+            n_results=self.settings.retrieval_candidate_k,
             include=["documents", "metadatas", "distances"],
         )
 
@@ -118,6 +176,14 @@ class ChromaDBRetriever(BaseRetriever):
             doc_metadata = dict(metadata) if metadata else {}
             doc_metadata["similarity_score"] = round(similarity, 4)
             doc_metadata["distance"] = round(distance, 4)
+
+            # Older ingestions only store `filename`; normalize to `source`
+            # so the UI and prompts can always show a meaningful label.
+            if not doc_metadata.get("source"):
+                filename = doc_metadata.get("filename")
+                if isinstance(filename, str) and filename:
+                    doc_metadata["source"] = filename
+                    doc_metadata["source_basename"] = PurePath(filename).name
 
             documents.append(
                 Document(page_content=doc_text, metadata=doc_metadata)

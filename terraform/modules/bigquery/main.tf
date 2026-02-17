@@ -150,6 +150,185 @@ resource "google_bigquery_table" "query_log" {
   ])
 }
 
+# --- Phase 6: Retrieval evaluation observability ---
+
+resource "google_bigquery_table" "retrieval_eval_runs" {
+  dataset_id          = google_bigquery_dataset.platform_observability.dataset_id
+  table_id            = "retrieval_eval_runs"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Phase 6 retrieval evaluation run summaries (hit@k, MRR, latency percentiles)"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "timestamp"
+  }
+
+  schema = jsonencode([
+    {
+      name = "timestamp"
+      type = "TIMESTAMP"
+      mode = "REQUIRED"
+    },
+    {
+      name = "run_id"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "run_label"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "reranker_requested"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "reranker_effective"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "reranker_model"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+    {
+      name = "retrieval_candidate_k"
+      type = "INTEGER"
+      mode = "REQUIRED"
+    },
+    {
+      name = "retrieval_final_k"
+      type = "INTEGER"
+      mode = "REQUIRED"
+    },
+    {
+      name = "query_count"
+      type = "INTEGER"
+      mode = "REQUIRED"
+    },
+    {
+      name = "hit_at_k"
+      type = "FLOAT"
+      mode = "REQUIRED"
+    },
+    {
+      name = "mrr"
+      type = "FLOAT"
+      mode = "REQUIRED"
+    },
+    {
+      name = "retrieval_latency_p50_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "retrieval_latency_p95_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "total_latency_p50_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "total_latency_p95_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "notes"
+      type = "STRING"
+      mode = "NULLABLE"
+    },
+  ])
+}
+
+resource "google_bigquery_table" "retrieval_eval_query_results" {
+  dataset_id          = google_bigquery_dataset.platform_observability.dataset_id
+  table_id            = "retrieval_eval_query_results"
+  project             = var.project_id
+  deletion_protection = false
+  description         = "Phase 6 per-query retrieval evaluation results"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "timestamp"
+  }
+
+  schema = jsonencode([
+    {
+      name = "timestamp"
+      type = "TIMESTAMP"
+      mode = "REQUIRED"
+    },
+    {
+      name = "run_id"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "query_index"
+      type = "INTEGER"
+      mode = "REQUIRED"
+    },
+    {
+      name = "query"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+    {
+      name = "expected_sources"
+      type = "STRING"
+      mode = "REPEATED"
+    },
+    {
+      name = "top_sources"
+      type = "STRING"
+      mode = "REPEATED"
+    },
+    {
+      name = "hit"
+      type = "BOOLEAN"
+      mode = "REQUIRED"
+    },
+    {
+      name = "reciprocal_rank"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "retrieval_latency_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "total_latency_ms"
+      type = "FLOAT"
+      mode = "NULLABLE"
+    },
+    {
+      name = "candidate_count"
+      type = "INTEGER"
+      mode = "NULLABLE"
+    },
+    {
+      name = "returned_count"
+      type = "INTEGER"
+      mode = "NULLABLE"
+    },
+    {
+      name = "reranker_effective"
+      type = "STRING"
+      mode = "REQUIRED"
+    },
+  ])
+}
+
 # --- Phase 4: Infrastructure metrics dataset ---
 
 resource "google_bigquery_dataset" "infrastructure_metrics" {

@@ -75,6 +75,17 @@ check "iap_requires_oauth_client" {
   }
 }
 
+check "retrieval_tuning_bounds" {
+  assert {
+    condition = (
+      var.retrieval_final_k > 0 &&
+      var.retrieval_candidate_k >= var.retrieval_final_k &&
+      var.reranker_max_candidates >= var.retrieval_final_k
+    )
+    error_message = "Phase 6 retrieval tuning invalid: retrieval_final_k must be > 0, retrieval_candidate_k must be >= retrieval_final_k, and reranker_max_candidates must be >= retrieval_final_k."
+  }
+}
+
 module "gcs" {
   source = "./modules/gcs"
 
@@ -165,6 +176,11 @@ module "cloud_run_rag" {
   bigquery_observability_dataset = module.bigquery.dataset_id
   frontend_sa_email              = module.iam.frontend_sa_email
   gateway_sa_email               = module.iam.gateway_sa_email
+  retrieval_candidate_k          = var.retrieval_candidate_k
+  retrieval_final_k              = var.retrieval_final_k
+  rerank_enabled                 = var.rerank_enabled
+  reranker_model                 = var.reranker_model
+  reranker_max_candidates        = var.reranker_max_candidates
 
   depends_on = [module.chromadb, module.bigquery, module.iam, module.gcs]
 }

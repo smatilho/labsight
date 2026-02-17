@@ -15,6 +15,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from pathlib import PurePath
 from typing import AsyncIterator
 
 from langchain_core.documents import Document
@@ -22,6 +23,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.retrievers import BaseRetriever
 
+from app.rag.reranker import BaseReranker, NoOpReranker
 from app.utils import sse_event as _sse
 
 logger = logging.getLogger(__name__)
@@ -68,15 +70,31 @@ def _format_context(documents: list[Document]) -> tuple[str, list[SourceDocument
     sources: list[SourceDocument] = []
 
     for i, doc in enumerate(documents, start=1):
-        source_label = doc.metadata.get("source", "unknown")
+        metadata = dict(doc.metadata or {})
+        source_value = metadata.get("source")
+        if not source_value:
+            source_value = metadata.get("filename")
+
+        if source_value:
+            source_value_str = str(source_value)
+            metadata.setdefault("source", source_value_str)
+            metadata.setdefault("source_basename", PurePath(source_value_str).name)
+        else:
+            source_value_str = ""
+
+        source_label = (
+            PurePath(source_value_str).name
+            if source_value_str
+            else "unknown"
+        )
         context_parts.append(f"[Source {i}] (from {source_label}):\n{doc.page_content}")
 
         sources.append(
             SourceDocument(
                 index=i,
                 content=doc.page_content[:200],
-                metadata=doc.metadata,
-                similarity_score=doc.metadata.get("similarity_score", 0.0),
+                metadata=metadata,
+                similarity_score=metadata.get("similarity_score", 0.0),
             )
         )
 
@@ -91,17 +109,47 @@ class RAGChain:
         retriever: BaseRetriever,
         llm: BaseChatModel,
         model_name: str,
+        reranker: BaseReranker | None = None,
+        retrieval_final_k: int = 5,
     ) -> None:
         self._retriever = retriever
         self._llm = llm
         self._model_name = model_name
+        self._reranker = reranker or NoOpReranker()
+        self._retrieval_final_k = retrieval_final_k
+
+    def _select_documents(self, query: str) -> list[Document]:
+        """Retrieve candidates and rerank/select final docs."""
+        candidate_docs = self._retriever.invoke(query)
+        if not candidate_docs:
+            return []
+
+        try:
+            final_docs = self._reranker.rerank(
+                query=query,
+                docs=candidate_docs,
+                top_k=self._retrieval_final_k,
+            )
+        except Exception:
+            logger.exception("Reranker failed; falling back to ANN retrieval order")
+            final_docs = NoOpReranker().rerank(
+                query=query,
+                docs=candidate_docs,
+                top_k=self._retrieval_final_k,
+            )
+
+        logger.info(
+            "RAG retrieval selected %d/%d docs for generation",
+            len(final_docs),
+            len(candidate_docs),
+        )
+        return final_docs
 
     def invoke(self, query: str) -> RAGResponse:
         """Run the full RAG pipeline and return a complete response."""
         start = time.monotonic()
 
-        # Retrieve
-        documents = self._retriever.invoke(query)
+        documents = self._select_documents(query)
         if not documents:
             return RAGResponse(
                 answer="I couldn't find any relevant documents to answer your question.",
@@ -151,7 +199,7 @@ class RAGChain:
         start = time.monotonic()
 
         try:
-            documents = self._retriever.invoke(query)
+            documents = self._select_documents(query)
             if not documents:
                 yield _sse(
                     {"type": "token", "content": "I couldn't find any relevant documents to answer your question."}
@@ -201,5 +249,3 @@ class RAGChain:
                 "latency_ms": round(latency_ms, 1),
                 "retrieval_count": 0,
             })
-
-

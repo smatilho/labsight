@@ -11,7 +11,7 @@ export interface ChatSource {
   index: number;
   content: string;
   similarity_score: number;
-  metadata: Record<string, string>;
+  metadata: Record<string, string | number | boolean | null>;
 }
 
 export interface ChatResponse {

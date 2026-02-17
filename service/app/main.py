@@ -18,6 +18,7 @@ from app.config import Settings
 from app.llm.provider import create_provider
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.rag.chain import RAGChain
+from app.rag.reranker import CrossEncoderReranker, NoOpReranker
 from app.rag.retriever import ChromaDBRetriever
 from app.routers import chat, dashboard, health, upload
 
@@ -32,10 +33,30 @@ async def lifespan(app: FastAPI):
     provider = create_provider(settings)
     retriever = ChromaDBRetriever(settings=settings)
     llm = provider.get_chat_model()
+    reranker = NoOpReranker()
+    if settings.rerank_enabled:
+        try:
+            reranker = CrossEncoderReranker(
+                model_name=settings.reranker_model,
+                max_candidates=settings.reranker_max_candidates,
+            )
+            reranker.ensure_ready()
+            logger.info(
+                "Reranker enabled (model=%s, max_candidates=%d)",
+                settings.reranker_model,
+                settings.reranker_max_candidates,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to initialize cross-encoder reranker; falling back to ANN order"
+            )
+            reranker = NoOpReranker()
     chain = RAGChain(
         retriever=retriever,
         llm=llm,
         model_name=provider.get_model_name(),
+        reranker=reranker,
+        retrieval_final_k=settings.retrieval_final_k,
     )
 
     app.state.settings = settings

@@ -45,3 +45,27 @@ class TestSQLPolicyValidation:
         s = Settings(**_BASE)
         assert s.sql_policy_mode == "strict"
         assert len(s.get_allowed_tables_set()) > 0
+
+
+class TestRetrievalTuningValidation:
+    """Phase 6 retrieval tuning settings are validated at startup."""
+
+    def test_candidate_k_must_be_gte_final_k(self) -> None:
+        with pytest.raises(ValidationError, match="retrieval_candidate_k"):
+            Settings(**_BASE, retrieval_candidate_k=3, retrieval_final_k=5)
+
+    def test_final_k_must_be_positive(self) -> None:
+        with pytest.raises(ValidationError, match="retrieval_final_k"):
+            Settings(**_BASE, retrieval_final_k=0)
+
+    def test_valid_retrieval_tuning_values(self) -> None:
+        s = Settings(
+            **_BASE,
+            retrieval_candidate_k=25,
+            retrieval_final_k=7,
+            rerank_enabled=True,
+            reranker_max_candidates=30,
+        )
+        assert s.retrieval_candidate_k == 25
+        assert s.retrieval_final_k == 7
+        assert s.rerank_enabled is True

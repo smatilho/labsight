@@ -8,6 +8,7 @@ import DataTable from "@/components/DataTable";
 import DropZone from "@/components/DropZone";
 import FileStatus from "@/components/FileStatus";
 import ToolCallIndicator from "@/components/ToolCallIndicator";
+import SourceCard from "@/components/SourceCard";
 
 describe("MetricCard", () => {
   it("renders label and value", () => {
@@ -153,5 +154,39 @@ describe("ToolCallIndicator", () => {
   it("shows generic label for unknown tool", () => {
     render(<ToolCallIndicator tool="custom_tool" />);
     expect(screen.getByText("Running custom_tool...")).toBeInTheDocument();
+  });
+});
+
+describe("SourceCard", () => {
+  it("falls back to filename when source is missing", () => {
+    render(
+      <SourceCard
+        source={{
+          index: 1,
+          similarity_score: 0.62,
+          content: "content",
+          metadata: { filename: "uploads/2026/02/16/guide.md" },
+        }}
+      />
+    );
+
+    expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("guide.md")).toBeInTheDocument();
+  });
+
+  it("uses 1-based source index from backend as-is", () => {
+    render(
+      <SourceCard
+        source={{
+          index: 3,
+          similarity_score: 0.5,
+          content: "content",
+          metadata: { source: "docs.md" },
+        }}
+      />
+    );
+
+    expect(screen.getByText("#3")).toBeInTheDocument();
+    expect(screen.queryByText("#4")).not.toBeInTheDocument();
   });
 });
